@@ -38,7 +38,7 @@
 ./gradlew :app:assembleDebug :app:lintDebug :core:search:build
 ```
 
-- 当前搜索模块只有模型，没有测试；后续实现匹配/排序时必须增加有意义的纯 JVM 测试，并执行 `:core:search:test`。
+- 搜索模块已有 T9 匹配与纯 JVM 测试；变更匹配/排序时必须补充有意义的回归用例，并执行 `:core:search:test`。
 - 算法用固定数据、固定时钟验证；禁止依赖真实个人使用记录或本机安装应用列表作为测试期望。
 - 窗口、权限、后台启动和悬浮球需要设备验证，不能用单元测试或构建成功代替。
 - M1 可使用 `python3 tools/smoke_android.py --serial <模拟器序列号>` 复验。脚本仅操作模拟器，测试权限与磁贴会恢复；不在用户真机上运行。

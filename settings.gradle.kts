@@ -11,6 +11,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        exclusiveContent {
+            forRepository { maven("https://maven.aliyun.com/repository/public") }
+            filter { includeModule("com.github.promeg", "tinypinyin") }
+        }
     }
 }
 

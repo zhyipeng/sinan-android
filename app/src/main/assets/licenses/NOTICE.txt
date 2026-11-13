@@ -1,0 +1,11 @@
+Third-party runtime components used by Sinan Android:
+
+TinyPinyin 2.0.3 (com.github.promeg:tinypinyin)
+Project: https://github.com/promeG/TinyPinyin
+License: Apache License 2.0; see Apache-2.0.txt in this directory.
+
+Aho-Corasick 0.3.0 (org.ahocorasick:ahocorasick), TinyPinyin runtime dependency
+Project: https://github.com/robert-bor/aho-corasick
+License: Apache License 2.0; see Apache-2.0.txt in this directory.
+
+These component licenses do not define the license of Sinan Android itself.

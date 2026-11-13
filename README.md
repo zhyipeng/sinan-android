@@ -6,7 +6,7 @@ Android 悬浮式应用启动工具：按需唤出面板，通过内置 T9 九�
 
 2026-11-13 已完成第一轮系统能力迭代（`0.2.0-dev`）：真实应用网格、点击启动、按需悬浮面板、悬浮权限引导与降级、快捷设置磁贴。已在 Android 10 / 15 模拟器通过流程验证；最低版本、Android 16 和厂商真机兼容性仍待验证。
 
-当前网格按名称排序，仅显示当前用户资料的启动入口。T9 键盘、拼音匹配、智能排序与悬浮球尚未实现；纯 Kotlin 搜索模块仍只有数据模型。
+当前网格按名称排序，仅显示当前用户资料的启动入口。纯 Kotlin T9 引擎已实现简拼、全拼、混合拼音、英文、别名和数字匹配，并通过测试；Android 键盘与引擎接入进行中。智能排序与悬浮球尚未实现。
 
 已确定的产品方向：
 
@@ -52,7 +52,7 @@ gradle/               版本目录和 Gradle Wrapper
 ./gradlew :app:installDebug
 ```
 
-APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。安装命令需要连接已授权的设备或模拟器。搜索模块当前没有算法实现或测试用例，构建成功不等于完成搜索功能验证。
+APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。安装命令需要连接已授权的设备或模拟器。搜索模块可通过 `./gradlew :core:search:test` 运行固定样例和边界测试；构建成功不等于完成 Android 搜索交互和性能验收。
 
 AGP 与 Kotlin 的兼容依据见 [Android 官方说明](https://developer.android.com/build/releases/agp-8-13-0-release-notes)和 [Kotlin 官方兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)。AGP 8.13.2 补充 Kotlin 2.3 的 R8 支持；具体工具链以实际构建结果为准，不自动追随最新版本。
 

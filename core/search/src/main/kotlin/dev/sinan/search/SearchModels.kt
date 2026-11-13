@@ -15,7 +15,7 @@ data class AppEntry(
     val aliases: List<String> = emptyList(),
 )
 
-/** 按优先级从高到低声明；具体匹配器将在后续里程碑实现。 */
+/** 按优先级从高到低声明；使用分数不能跨越匹配等级。 */
 enum class MatchTier {
     CUSTOM_ALIAS_EXACT,
     INITIALS_EXACT,
@@ -26,10 +26,12 @@ enum class MatchTier {
     MIXED_PINYIN_PREFIX,
     LATIN_OR_ALIAS_PREFIX,
     SYLLABLE_SUBSTRING,
+    BROWSE,
 }
 
 data class SearchResult(
     val app: AppEntry,
     val matchTier: MatchTier,
     val personalizedScore: Double,
+    val isComplete: Boolean = false,
 )
