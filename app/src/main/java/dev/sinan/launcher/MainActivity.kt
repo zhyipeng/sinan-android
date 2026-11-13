@@ -1,5 +1,9 @@
 package dev.sinan.launcher
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import dev.sinan.launcher.ball.FloatingBallService
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -20,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var permission: Button
     private lateinit var description: TextView
     private lateinit var grid: AppGridView
+    private var notificationRequested = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,12 +103,67 @@ class MainActivity : Activity() {
     }
 
     private fun showSettingsMenu() {
+        val ball = (application as SinanApplication).ball
         AlertDialog.Builder(this)
             .setTitle(R.string.settings)
-            .setItems(arrayOf(getString(if (Settings.canDrawOverlays(this)) R.string.open_panel else R.string.allow_overlay), getString(R.string.usage_records))) { _, index ->
-                if (index == 1) showUsageRecords()
-                else if (Settings.canDrawOverlays(this)) openPanel() else requestOverlay()
+            .setItems(arrayOf(getString(if (Settings.canDrawOverlays(this)) R.string.open_panel else R.string.allow_overlay), getString(R.string.usage_records), getString(if (ball.isEnabled) R.string.ball_disable else R.string.ball_enable))) { _, index ->
+                when (index) {
+                    0 -> if (Settings.canDrawOverlays(this)) openPanel() else requestOverlay()
+                    1 -> showUsageRecords()
+                    2 -> if (ball.isEnabled) ball.disable() else explainBall()
+                }
             }.show()
+    }
+
+    private fun explainBall() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.ball_enable)
+            .setMessage(R.string.ball_explanation)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.ball_enable) { _, _ -> enableBall() }
+            .show()
+    }
+
+    private fun enableBall() {
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.ball_overlay_needed, Toast.LENGTH_LONG).show()
+            requestOverlay()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (notificationRequested && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                notificationSettings()
+            } else {
+                // 同一设置会话内拒绝后可转到系统通知设置，不保存开启状态。
+                notificationRequested = true
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), BALL_NOTIFICATION_REQUEST)
+            }
+            return
+        }
+        FloatingBallService.ensureChannel(this)
+        if (!FloatingBallService.notificationsAvailable(this)) { notificationSettings(); return }
+        (application as SinanApplication).ball.enable()
+    }
+
+    private fun notificationSettings() {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.ball_notification_needed)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.ball_notification_settings) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+                } catch (_: android.content.ActivityNotFoundException) {
+                    Toast.makeText(this, R.string.ball_failed, Toast.LENGTH_LONG).show()
+                }
+            }.show()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == BALL_NOTIFICATION_REQUEST) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED && !isFinishing) enableBall()
+            else Toast.makeText(this, R.string.ball_notification_needed, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showUsageRecords() {
@@ -123,6 +183,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private const val BALL_NOTIFICATION_REQUEST = 210
         const val SHOW_SETTINGS = "dev.sinan.launcher.SHOW_SETTINGS"
     }
 }

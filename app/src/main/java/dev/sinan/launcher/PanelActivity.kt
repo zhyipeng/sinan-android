@@ -63,6 +63,7 @@ class PanelActivity : Activity() {
             }
             dialog.show()
             resizePanel()
+            (application as SinanApplication).ball.panelShown(this)
             getSystemService(DisplayManager::class.java).registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
             watchingDisplay = true
         } catch (_: SecurityException) {
@@ -74,6 +75,7 @@ class PanelActivity : Activity() {
     }
 
     override fun onStop() {
+        (application as SinanApplication).ball.panelHidden(this)
         stopWatchingDisplay()
         if (isChangingConfigurations) panel?.setOnDismissListener(null)
         panel?.dismiss()
@@ -81,6 +83,7 @@ class PanelActivity : Activity() {
     }
 
     override fun onDestroy() {
+        (application as SinanApplication).ball.panelHidden(this)
         stopWatchingDisplay()
         panel?.setOnDismissListener(null)
         panel?.dismiss()
