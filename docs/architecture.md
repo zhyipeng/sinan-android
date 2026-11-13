@@ -4,7 +4,7 @@
 
 Kotlin + Android 原生 View，最低 API 26，编译与目标 API 36。当前工程实际只有 `app` 与 `core/search` 两个模块，不提前拆分大量 Gradle 模块。
 
-`app` 包含一个使用系统栏 Insets 的说明页；`core/search` 包含应用 ID、索引条目和搜索结果模型。下列组件均为后续设计，尚未实现。
+截至 2026-11-13，`app` 已实现 `AppRepository`、`AppGridView`、`MainActivity`、`PanelActivity` 和 `SinanTileService`；`core/search` 仍只有应用 ID、索引条目和搜索结果模型。下表为完整目标架构，未在上述实际组件中出现的部分仍是规划。
 
 | 组件 | 职责与依赖边界 |
 | --- | --- |
@@ -66,3 +66,17 @@ T9 输入 → 匹配候选 → 等级排序 → 按 AppId 去重 → 网格
 | 屏幕适配 | 全面屏手势、导航栏、横屏、折叠屏、字体缩放可操作 |
 
 建议覆盖最低支持版本、API 35/36 和至少两类常见厂商真机。仅有编译和 Lint 通过不能关闭这些任务。
+
+## M1 已实现的系统适配
+
+- `MainActivity`：未授权时展示普通应用网格和权限入口；有权限且从桌面/磁贴打开时转入面板。「设置」通过内部标记强制打开普通页面。
+- `PanelActivity`：透明的前台 Activity，使用原生 Dialog 的窗口管理和返回/外部点击分发，窗口类型明确设置为 `TYPE_APPLICATION_OVERLAY`。每次唤出仅保留一个实例，关闭或宿主停止时移除窗口；配置重建时不额外结束新宿主。
+- 该宿主是用户主动唤出的前台界面，不让隐藏进程直接启动悬浮服务。没有常驻服务、前台服务、后台保活、通知或开机启动。
+- 磁贴由系统绑定 `TileService`，受 `BIND_QUICK_SETTINGS_TILE` 保护。API 34+ 使用 PendingIntent 重载收起通知栏并启动；API 26–33 才使用旧 Intent 重载。锁定状态通过 `unlockAndRun`，锁屏流程尚未专项验收。
+- `AppRepository` 仅访问 `Process.myUserHandle()`，从 `LauncherApps` 获取入口，再与最小 MAIN/LAUNCHER 查询相交，排除合成的应用详情页；不申请全量包查询或使用情况访问权限。
+- 文本扫描和图标加载使用两条后台工作线程；文本列表保留会话快照，图标 ConstantState 使用 48 项 LRU。包变化使下次打开时的快照失效，不在手指准备点击时重排当前网格。
+- 图标回调以绑定 ID 和视图代次防止异步错位，缓存同步命中允许在视图挂载前赋图。当前按系统名称排序，未记录任何启动历史或查询数据。
+- 系统配置改变时清空文本和图标缓存；图标任务以索引代次检查，避免失效前的异步图标重新填入新缓存。
+- 首版界面采用图标品牌蓝 `#2954CE`、浅底 `#F5F7FC`、深底 `#151D30`、正文 `#192743` / `#EAF0FF`，原生字体；手机默认四列，宽屏六列。面板最大宽 560dp、高为宿主显示区域的 66%，横屏具体可用区域受系统/宿主约束。
+
+接口依据：[LauncherApps](https://developer.android.com/reference/android/content/pm/LauncherApps)、[WindowManager.LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams)、[TileService](https://developer.android.com/reference/android/service/quicksettings/TileService)。实际兼容结论以 [设备验证记录](validation-m1.md) 为限。

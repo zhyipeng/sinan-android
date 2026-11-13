@@ -1,5 +1,17 @@
 <resources>
   <string name="app_name">司南</string>
-  <string name="app_description">按需唤出，快速找到并启动应用。</string>
-  <string name="scaffold_status">工程已建立\n\n后续将提供悬浮应用网格、内置九宫格拼音搜索和常用应用智能排序。\n\n当前为开发骨架，尚未接入应用搜索、悬浮面板和启动功能。</string>
+  <string name="overlay_optional">直接点击应用即可启动。允许悬浮显示后，可在当前页面上方打开面板。</string>
+  <string name="overlay_enabled">悬浮显示已开启。下次点击司南图标即可打开面板。</string>
+  <string name="allow_overlay">允许悬浮显示</string>
+  <string name="open_panel">打开悬浮面板</string>
+  <string name="settings">设置</string>
+  <string name="close">关闭</string>
+  <string name="retry">重新读取</string>
+  <string name="loading_apps">正在读取应用…</string>
+  <string name="apps_count">%1$d 个应用，按名称排列</string>
+  <string name="no_apps">未找到可启动的应用，可重新读取。</string>
+  <string name="apps_failed">无法读取应用，请重新读取。</string>
+  <string name="launch_failed">应用暂时无法打开，已刷新应用列表。</string>
+  <string name="permission_settings_failed">无法打开权限设置，你仍可使用下方应用网格。</string>
+  <string name="overlay_failed">暂时无法显示悬浮面板，请使用应用网格。</string>
 </resources>

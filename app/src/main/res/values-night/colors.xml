@@ -1,4 +1,5 @@
 <resources>
-  <color name="page_background">#17201C</color>
-  <color name="text_primary">#ECF1EB</color>
+  <color name="page_background">#151D30</color>
+  <color name="text_primary">#EAF0FF</color>
+  <color name="text_secondary">#A8B8D5</color>
 </resources>

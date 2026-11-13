@@ -1,8 +1,14 @@
 <resources>
   <style name="Theme.Sinan" parent="android:style/Theme.Material.NoActionBar">
     <item name="android:fontFamily">sans</item>
-    <item name="android:colorAccent">#9AD5BA</item>
+    <item name="android:colorAccent">#A8C2FF</item>
     <item name="android:windowLightStatusBar">false</item>
     <item name="android:windowBackground">@color/page_background</item>
+  </style>
+  <style name="Theme.Sinan.Panel" parent="android:style/Theme.Material.Dialog.NoActionBar">
+    <item name="android:windowBackground">@drawable/panel_background</item>
+    <item name="android:colorAccent">#A8C2FF</item>
+    <item name="android:windowMinWidthMajor">100%</item>
+    <item name="android:windowMinWidthMinor">100%</item>
   </style>
 </resources>

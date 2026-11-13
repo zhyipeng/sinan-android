@@ -1,24 +1,51 @@
 package dev.sinan.launcher
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowInsets
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import dev.sinan.launcher.ui.AppGridView
+import dev.sinan.launcher.ui.dp
+import dev.sinan.launcher.ui.heading
 
-/** 立项骨架入口。悬浮窗口、权限引导与搜索交互尚未实现。 */
+/** 无悬浮权限时直接使用网格；已有权限时桌面入口默认打开面板。 */
 class MainActivity : Activity() {
+    private lateinit var permission: Button
+    private lateinit var description: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        if (android.os.Build.VERSION.SDK_INT >= 28) {
-            findViewById<TextView>(R.id.heading).isAccessibilityHeading = true
+        if (savedInstanceState == null && !intent.getBooleanExtra(SHOW_SETTINGS, false) && Settings.canDrawOverlays(this)) {
+            openPanel()
+            return
         }
-
-        val content = findViewById<LinearLayout>(R.id.content)
-        val padding = resources.getDimensionPixelSize(R.dimen.page_padding)
-        content.setOnApplyWindowInsetsListener { view, insets ->
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+        }
+        root.addView(heading().apply { setText(R.string.app_name) })
+        description = TextView(this).apply {
+            textSize = 14f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, dp(12), 0, dp(8))
+        }
+        root.addView(description)
+        permission = Button(this).apply {
+            isAllCaps = false
+            setOnClickListener {
+                if (Settings.canDrawOverlays(this@MainActivity)) openPanel() else requestOverlay()
+            }
+        }
+        root.addView(permission, LinearLayout.LayoutParams(-1, -2))
+        root.addView(AppGridView(this) { finish() }, LinearLayout.LayoutParams(-1, 0, 1f))
+        setContentView(root)
+        root.setOnApplyWindowInsetsListener { view, insets ->
             @Suppress("DEPRECATION")
             val edges = if (android.os.Build.VERSION.SDK_INT >= 30) {
                 val bars = insets.getInsets(
@@ -33,14 +60,35 @@ class MainActivity : Activity() {
                     insets.systemWindowInsetBottom,
                 )
             }
-            view.setPadding(
-                padding + edges.left,
-                padding + edges.top,
-                padding + edges.right,
-                padding + edges.bottom,
-            )
+            view.setPadding(dp(20) + edges.left, dp(16) + edges.top, dp(20) + edges.right, dp(16) + edges.bottom)
             insets
         }
-        content.requestApplyInsets()
+        root.requestApplyInsets()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::permission.isInitialized) {
+            val allowed = Settings.canDrawOverlays(this)
+            permission.setText(if (allowed) R.string.open_panel else R.string.allow_overlay)
+            description.setText(if (allowed) R.string.overlay_enabled else R.string.overlay_optional)
+        }
+    }
+
+    private fun requestOverlay() {
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, R.string.permission_settings_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun openPanel() {
+        startActivity(Intent(this, PanelActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        finish()
+    }
+
+    companion object {
+        const val SHOW_SETTINGS = "dev.sinan.launcher.SHOW_SETTINGS"
     }
 }
