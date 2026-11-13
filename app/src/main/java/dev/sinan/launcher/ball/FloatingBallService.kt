@@ -126,7 +126,8 @@ class FloatingBallService : Service() {
     private fun notification(): Notification {
         ensureChannel(this)
         fun activity(code: Int, settings: Boolean) = PendingIntent.getActivity(this, code,
-            Intent(this, MainActivity::class.java).putExtra(MainActivity.SHOW_SETTINGS, settings)
+            (if (settings) Intent(this, PanelActivity::class.java).putExtra(PanelActivity.OPEN_SETTINGS, true)
+             else Intent(this, MainActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 3, Intent(this, javaClass).setAction(ACTION_STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL_ID)

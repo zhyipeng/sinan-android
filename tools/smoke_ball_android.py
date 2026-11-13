@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
     parser.add_argument('--adb', default='adb')
+    parser.add_argument('--panel-settings', action='store_true', help='通过面板内设置页开启/关闭')
     parser.add_argument('--apk', default='app/build/outputs/apk/debug/app-debug.apk')
     args = parser.parse_args()
     adb = [args.adb, '-s', args.serial]
@@ -68,14 +69,21 @@ def main():
         tap_node(next((n for n in candidates if n.get('class') == 'android.widget.Button'), candidates[0]))
 
     def start_settings():
-        sh('am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', '--ez', PACKAGE + '.SHOW_SETTINGS', 'true')
+        sh('am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', '--ez', PACKAGE + '.SHOW_SETTINGS', 'false' if args.panel_settings else 'true')
+        if args.panel_settings and 'allow' in sh('appops', 'get', PACKAGE, 'SYSTEM_ALERT_WINDOW'):
+            wait(lambda: bool(panels()), '入口未切换到面板')
+            if not any(n.get('content-desc') == '返回搜索' for n in nodes().iter('node')):
+                tap('设置')
 
     def enable():
         start_settings()
-        tap('设置'); tap('开启悬浮球'); tap('开启悬浮球')
+        if not args.panel_settings: tap('设置')
+        tap('开启悬浮球'); tap('开启悬浮球')
 
     def stop_settings():
-        start_settings(); tap('设置'); tap('关闭悬浮球')
+        start_settings()
+        if not args.panel_settings: tap('设置')
+        tap('关闭悬浮球')
         wait(lambda: not balls() and not service(), '设置关闭后资源未释放')
 
     def tap_ball():
@@ -133,6 +141,7 @@ def main():
             print('PASS 按需通知授权、拒绝不启用、再次授权', flush=True)
         else:
             enable()
+        sh('input', 'keyevent', 'KEYCODE_HOME')
         wait(lambda: len(balls()) == 1 and service(), '未开启唯一悬浮球服务')
         details = sh('dumpsys', 'activity', 'services', PACKAGE)
         assert 'isForeground=true' in details, '未以前台服务运行'
@@ -154,6 +163,7 @@ def main():
         assert not panels(), '拖动误触打开面板'
         saved = ball_bounds()
         stop_settings(); enable()
+        sh('input', 'keyevent', 'KEYCODE_HOME')
         wait(lambda: len(balls()) == 1, '关闭后未重新开启')
         wait(lambda: abs(ball_bounds()[1] - saved[1]) < 8 and abs(ball_bounds()[0] - saved[0]) < 8, '重开位置未保留')
         # API 29 镜像的 run-as 调试域拒绝发送 SIGKILL；该镜像改用强制停止。
@@ -168,7 +178,7 @@ def main():
         time.sleep(2)
         assert no_ball(), '进程被杀后服务自动拉起'
         start_settings(); assert no_ball(), '重新打开应用时擅自恢复球'
-        enable(); wait(lambda: len(balls()) == 1, '进程重建后手动开启失败')
+        enable(); sh('input', 'keyevent', 'KEYCODE_HOME'); wait(lambda: len(balls()) == 1, '进程重建后手动开启失败')
         wait(lambda: abs(ball_bounds()[1] - saved[1]) < 8 and abs(ball_bounds()[0] - saved[0]) < 8, '跨进程位置未保留')
         print('PASS 拖动贴边不误触、设置关闭、跨进程位置保留、被杀不自启', flush=True)
 
@@ -177,7 +187,7 @@ def main():
         sh('input', 'keyevent', 'KEYCODE_WAKEUP')
         sh('wm', 'dismiss-keyguard')
         wait(lambda: len(balls()) == 1, '解锁后球未恢复')
-        start_settings()  # 系统设置的敏感页面可能主动隐藏第三方 Overlay，使用自身普通页旋转。
+        sh('am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', '--ez', PACKAGE + '.SHOW_SETTINGS', 'true')  # 普通页旋转，避免面板主动隐藏球。
         sh('settings', 'put', 'system', 'accelerometer_rotation', '0')
         sh('settings', 'put', 'system', 'user_rotation', '1')
         if api == 29:
@@ -209,7 +219,7 @@ def main():
         sh('cmd', 'statusbar', 'collapse')
         print('PASS 通知关闭入口', flush=True)
 
-        enable(); wait(lambda: len(balls()) == 1, '再次开启失败')
+        enable(); sh('input', 'keyevent', 'KEYCODE_HOME'); wait(lambda: len(balls()) == 1, '再次开启失败')
         sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'deny')
         wait(no_ball, '悬浮权限撤销后仍保留服务/窗口')
         sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'allow')

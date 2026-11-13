@@ -169,11 +169,13 @@ def main():
         grid = next(n for n in own_nodes() if n.get("class") == "android.widget.GridView")
         return next(n.get("content-desc") for n in grid.iter("node") if n.get("content-desc"))
 
-    def clear_usage():
+    def clear_usage(expected_first=None):
         tap_text("使用记录")
         tap_text("清空记录")
         wait(usage_removed, "使用记录未删除")
-        wait(lambda: first_app() == "Calendar", "清空后未恢复镜像的名称首项 Calendar")
+        wait(lambda: any(n.get("class") == "android.widget.GridView" and n.get("enabled") == "true" for n in own_nodes()), "清空后网格未恢复")
+        if expected_first is not None:
+            wait(lambda: first_app() == expected_first, "清空后未恢复冷启动顺序")
 
     # 不把已有使用汇总读到电脑或输出中；备份只在应用自己的 no_backup 目录。
     stop()
@@ -208,7 +210,7 @@ def main():
         stop()
         start()
         assert first_app() == "Clock", "跨进程后未保留推荐"
-        clear_usage()
+        clear_usage(cold_first)
         assert first_app() == cold_first, "清空后冷启动顺序不稳定"
         stop()
         subprocess.run(adb + ["shell", "run-as", PACKAGE, "tee", usage_path], input=b"invalid usage fixture", capture_output=True, check=True, timeout=15)
@@ -246,6 +248,10 @@ def main():
         check_closed()
         open_overlay()
         search_clock(check_editing=False)
+        tap_text("设置")
+        assert any(n.get("content-desc") == "返回搜索" for n in own_nodes()), "未在面板内打开设置页"
+        shell("input", "keyevent", "KEYCODE_BACK")
+        assert any(n.get("content-desc") == "搜索数字：25625" for n in own_nodes()), "返回设置后查询丢失"
         tap_text("Clock")
         check_closed()
         wait(clock_open, "悬浮网格未启动 Clock")
@@ -256,9 +262,15 @@ def main():
         shell("cmd", "statusbar", "click-tile", TILE)
         wait(lambda: overlay_count() == 1, "磁贴未成功唤出面板")
         tap_text("设置")
-        check_closed()
-        assert any(n.get("text") == "打开悬浮面板" for n in own_nodes())
-        print("PASS 快捷设置磁贴、面板设置入口")
+        assert overlay_count() == 1, "设置跳出了悬浮面板"
+        assert any(n.get("content-desc") == "返回搜索" for n in own_nodes())
+        shot("panel-settings")
+        tap_text("使用记录")
+        shell("input", "keyevent", "KEYCODE_BACK")
+        assert any(n.get("content-desc") == "返回搜索" for n in own_nodes()), "关闭确认窗后丢失设置页"
+        tap_text("返回搜索")
+        assert overlay_count() == 1
+        print("PASS 快捷设置磁贴、面板内设置、返回保留查询")
 
         stop()
         allowed("deny")
