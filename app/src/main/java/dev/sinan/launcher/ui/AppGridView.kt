@@ -142,6 +142,8 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
         super.onDetachedFromWindow()
     }
 
+    fun refreshUsage() = refresh()
+
     private fun refresh() {
         val version = ++generation
         load?.cancel(true)
@@ -188,6 +190,7 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
                 query.isNotEmpty() && found.isEmpty() -> context.getString(R.string.no_matches)
                 query.isNotEmpty() -> context.getString(R.string.matches_count, found.size)
                 found.isEmpty() -> context.getString(R.string.no_apps)
+                data.hasUsage -> context.getString(R.string.apps_usage_count, found.size)
                 else -> context.getString(R.string.apps_count, found.size)
             }
             retry.visibility = if (query.isEmpty() && found.isEmpty()) VISIBLE else GONE

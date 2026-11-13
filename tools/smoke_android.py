@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在已启动的模拟器上验证系统入口与 T9；不连接真机、不清除数据。"""
+"""在模拟器验证入口、T9 和本地排序；在应用私有目录备份/恢复使用汇总。"""
 import argparse
 import re
 import subprocess
@@ -25,6 +25,17 @@ def main():
 
     def shell(*cmd):
         return run("shell", *cmd)
+
+    usage_path = "no_backup/usage-summary.bin"
+    usage_backup = "no_backup/usage-smoke-backup"
+    usage_files = ["usage-summary.bin", "usage-summary.bin.bak", "usage-summary.bin.new"]
+
+    def private_exists(path):
+        # Android 10 的 test 是 shell 内建命令，run-as 不能直接 exec 它。
+        return subprocess.run(adb + ["shell", "run-as", PACKAGE, "sh", "-c", "'test -f " + path + "'"], capture_output=True, timeout=15).returncode == 0
+
+    def usage_removed():
+        return not any(private_exists("no_backup/" + name) for name in usage_files)
 
     def wait(predicate, message):
         deadline = time.monotonic() + 12
@@ -139,7 +150,25 @@ def main():
         assert not any(n.get("text") == "Camera" for n in nodes), "网格仍包含不匹配应用"
         assert not any(n.get("class") == "android.widget.EditText" for n in nodes)
         shot("t9-fallback-query" if check_editing else "t9-overlay-query")
-        print("PASS T9 过滤" + ("、0/1、退格/长按清空、无结果、快速改输" if check_editing else "（悬浮面板）"))
+        print("PASS T9 过滤" + ("、0/1、退格/长按清空、无结果、快速改输" if check_editing else "（Clock）"))
+
+    def first_app():
+        grid = next(n for n in own_nodes() if n.get("class") == "android.widget.GridView")
+        return next(n.get("content-desc") for n in grid.iter("node") if n.get("content-desc"))
+
+    def clear_usage():
+        tap_text("使用记录")
+        tap_text("清空记录")
+        wait(usage_removed, "使用记录未删除")
+        wait(lambda: any(n.get("text", "").endswith("按名称排列") for n in own_nodes()), "清空后未恢复名称顺序")
+
+    # 不把已有使用汇总读到电脑或输出中；备份只在应用自己的 no_backup 目录。
+    stop()
+    shell("run-as", PACKAGE, "mkdir", "-p", "no_backup")
+    shell("run-as", PACKAGE, "mkdir", usage_backup)
+    for name in usage_files:
+        if private_exists("no_backup/" + name):
+            shell("run-as", PACKAGE, "cp", "no_backup/" + name, usage_backup + "/" + name)
 
     try:
         stop()
@@ -151,12 +180,40 @@ def main():
         tap_text("允许悬浮显示")
         wait(lambda: any("ResumedActivity" in line and "com.android.settings" in line for line in shell("dumpsys", "activity", "activities").splitlines()), "权限引导未进入设置")
         shell("input", "keyevent", "KEYCODE_BACK")
+        clear_usage()
+        cold_first = first_app()
+        assert cold_first != "Clock", "测试镜像需要默认名称顺序中有早于 Clock 的应用"
         search_clock(check_editing=True)
         tap_text("Clock")
         wait(clock_open, "降级网格未启动 Clock")
         print("PASS 无权限降级、权限引导返回、网格启动")
 
+        start()
+        assert first_app() == "Clock", "启动后未学习默认推荐"
+        assert private_exists(usage_path), "汇总未落盘"
+        shot("usage-learned")
+        stop()
+        start()
+        assert first_app() == "Clock", "跨进程后未保留推荐"
+        clear_usage()
+        assert first_app() == cold_first, "清空后冷启动顺序不稳定"
+        stop()
+        subprocess.run(adb + ["shell", "run-as", PACKAGE, "tee", usage_path], input=b"invalid usage fixture", capture_output=True, check=True, timeout=15)
+        start()
+        assert first_app() == cold_first, "损坏记录未降级"
+        tap_text("使用记录")
+        shot("usage-settings")
+        tap_text("清空记录")
+        wait(usage_removed, "损坏记录未清空")
+        search_clock(check_editing=False)
+        tap_text("Clock")
+        wait(clock_open, "清空后未恢复启动")
+        start()
+        assert first_app() == "Clock", "清空损坏记录后未恢复学习"
+        print("PASS 常用排序学习、跨进程保留、清空、损坏降级与恢复")
+
         allowed("allow")
+        stop()  # 推荐验证停留在普通页面，重新从桌面入口检查授权后的路由。
         open_overlay()
         shot("overlay")
         for _ in range(3):
@@ -200,9 +257,14 @@ def main():
         allowed(original)
         if added_tile:
             shell("cmd", "statusbar", "remove-tile", TILE)
+        for name in usage_files:
+            shell("run-as", PACKAGE, "rm", "-f", "no_backup/" + name)
+            if private_exists(usage_backup + "/" + name):
+                shell("run-as", PACKAGE, "mv", usage_backup + "/" + name, "no_backup/" + name)
+        shell("run-as", PACKAGE, "rmdir", usage_backup)
         shell("rm", "-f", "/sdcard/sinan-smoke.xml")
         start()
-    print("全部通过；测试权限和磁贴已恢复。截图:", output)
+    print("全部通过；测试权限、磁贴和原使用汇总已恢复。截图:", output)
 
 
 if __name__ == "__main__":

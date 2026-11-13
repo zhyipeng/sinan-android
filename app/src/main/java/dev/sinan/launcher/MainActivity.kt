@@ -1,6 +1,7 @@
 package dev.sinan.launcher
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +19,7 @@ import dev.sinan.launcher.ui.heading
 class MainActivity : Activity() {
     private lateinit var permission: Button
     private lateinit var description: TextView
+    private lateinit var grid: AppGridView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +31,13 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(16))
         }
-        root.addView(heading().apply { setText(R.string.app_name) })
+        val header = LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        header.addView(heading().apply { setText(R.string.app_name) }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(Button(this).apply {
+            setText(R.string.usage_records)
+            setOnClickListener { showUsageRecords() }
+        })
+        root.addView(header)
         description = TextView(this).apply {
             textSize = 14f
             setTextColor(getColor(R.color.text_secondary))
@@ -43,7 +51,8 @@ class MainActivity : Activity() {
             }
         }
         root.addView(permission, LinearLayout.LayoutParams(-1, -2))
-        root.addView(AppGridView(this) { finish() }, LinearLayout.LayoutParams(-1, 0, 1f))
+        grid = AppGridView(this) { finish() }
+        root.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         root.setOnApplyWindowInsetsListener { view, insets ->
             @Suppress("DEPRECATION")
@@ -86,6 +95,22 @@ class MainActivity : Activity() {
     private fun openPanel() {
         startActivity(Intent(this, PanelActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()
+    }
+
+    private fun showUsageRecords() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.usage_records)
+            .setMessage(R.string.usage_records_description)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.usage_clear) { _, _ ->
+                (application as SinanApplication).apps.clearUsage { result ->
+                    if (isFinishing || isDestroyed) return@clearUsage
+                    result.fold(onSuccess = {
+                        Toast.makeText(this, R.string.usage_cleared, Toast.LENGTH_SHORT).show()
+                        grid.refreshUsage()
+                    }, onFailure = { Toast.makeText(this, R.string.usage_clear_failed, Toast.LENGTH_LONG).show() })
+                }
+            }.show()
     }
 
     companion object {

@@ -14,15 +14,23 @@ import android.util.LruCache
 import dev.sinan.search.AppEntry
 import dev.sinan.search.AppId
 import dev.sinan.search.T9SearchEngine
+import dev.sinan.search.UsageRanker
+import dev.sinan.launcher.usage.LocalUsageRepository
 import java.text.Collator
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 data class LaunchableApp(val entry: AppEntry, val activity: LauncherActivityInfo)
 
-class AppSnapshot(val apps: List<LaunchableApp>) {
+class AppCatalog(val apps: List<LaunchableApp>) {
     val index = T9SearchEngine(apps.map { it.entry })
     val byId = apps.associateBy { it.entry.id }
+}
+
+class AppSnapshot(val catalog: AppCatalog, usageScores: Map<AppId, Double>) {
+    val scores = usageScores.toMap()
+    val apps = UsageRanker.order(catalog.apps.map { it.entry.id }, scores).mapNotNull { catalog.byId[it] }
+    val hasUsage = scores.values.any { it > 0 }
 }
 
 /** 当前资料的启动入口；包变更不改变已打开的网格快照。 */
@@ -32,7 +40,8 @@ class AppRepository(private val context: Context) {
     private val searchWorker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val icons = LruCache<AppId, Drawable.ConstantState>(48)
-    @Volatile private var snapshot: AppSnapshot? = null
+    private val usage = LocalUsageRepository(context.applicationContext)
+    @Volatile private var catalog: AppCatalog? = null
     @Volatile private var revision = 0
 
     init {
@@ -47,15 +56,15 @@ class AppRepository(private val context: Context) {
 
     fun invalidate() {
         revision++
-        snapshot = null
+        catalog = null
         icons.evictAll()
     }
 
     fun load(callback: (Result<AppSnapshot>) -> Unit): Future<*>? {
-        snapshot?.let { callback(Result.success(it)); return null }
         return worker.submit {
             val version = revision
             val result = runCatching {
+                catalog?.let { return@runCatching it }
                 val user = Process.myUserHandle()
                 val serial = context.getSystemService(UserManager::class.java).getSerialNumberForUser(user)
                 // 排除 LauncherApps 为无启动入口的应用合成的详情页。
@@ -70,15 +79,24 @@ class AppRepository(private val context: Context) {
                     .sortedWith { a, b ->
                         collator.compare(a.entry.label, b.entry.label).takeIf { it != 0 }
                             ?: a.activity.componentName.flattenToString().compareTo(b.activity.componentName.flattenToString())
-                    }.let(::AppSnapshot).also { if (version == revision) snapshot = it }
+                    }.let(::AppCatalog).also { if (version == revision) catalog = it }
             }
-            main.post { callback(result) }
+            result.fold(onSuccess = { data ->
+                usage.scores(data.apps.map { it.entry.id }) { scores ->
+                    val session = AppSnapshot(data, scores)
+                    main.post { callback(Result.success(session)) }
+                }
+            }, onFailure = { error -> main.post { callback(Result.failure(error)) } })
         }
     }
 
     fun search(data: AppSnapshot, query: String, callback: (List<LaunchableApp>) -> Unit): Future<*> = searchWorker.submit {
-        val results = if (query.isEmpty()) data.apps else data.index.search(query).mapNotNull { data.byId[it.app.id] }
+        val results = if (query.isEmpty()) data.apps else data.catalog.index.search(query, scores = data.scores).mapNotNull { data.catalog.byId[it.app.id] }
         if (!Thread.currentThread().isInterrupted) main.post { callback(results) }
+    }
+
+    fun clearUsage(callback: (Result<Unit>) -> Unit) {
+        usage.clear { result -> main.post { callback(result) } }
     }
 
     fun loadIcon(app: LaunchableApp, callback: (Drawable?) -> Unit) {
@@ -93,6 +111,7 @@ class AppRepository(private val context: Context) {
 
     fun launch(app: LaunchableApp): Boolean = try {
         launcher.startMainActivity(app.activity.componentName, app.activity.user, null, null)
+        usage.record(app.entry.id)
         true
     } catch (_: android.content.ActivityNotFoundException) {
         invalidate(); false
