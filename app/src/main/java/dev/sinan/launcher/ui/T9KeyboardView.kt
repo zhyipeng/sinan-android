@@ -2,6 +2,8 @@ package dev.sinan.launcher.ui
 
 import android.content.Context
 import android.view.Gravity
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.LinearLayout
 import dev.sinan.launcher.R
@@ -12,9 +14,9 @@ class T9KeyboardView @JvmOverloads constructor(
     onDigit: (Char) -> Unit = {},
     onDelete: () -> Unit = {},
     onClear: () -> Unit = {},
+    onSettings: () -> Unit = {},
 ) : LinearLayout(context) {
-    private val clear = Button(context)
-    private val delete = Button(context)
+    private val delete = ImageButton(context)
     private var rowHeight = context.dp(52)
 
     init {
@@ -28,14 +30,19 @@ class T9KeyboardView @JvmOverloads constructor(
                 setOnClickListener { onDigit(('0'.code + number).toChar()) }
             }
         } + listOf(
-            clear.apply { setText(R.string.input_clear); setOnClickListener { onClear() } },
+            ImageButton(context).apply {
+                setImageResource(R.drawable.ic_settings)
+                contentDescription = context.getString(R.string.settings)
+                setOnClickListener { onSettings() }
+            },
             Button(context).apply {
                 text = "0"
                 contentDescription = context.getString(R.string.t9_digit_description, "0", "")
                 setOnClickListener { onDigit('0') }
             },
             delete.apply {
-                setText(R.string.input_delete)
+                setImageResource(R.drawable.ic_backspace)
+                contentDescription = context.getString(R.string.input_delete_description)
                 setOnClickListener { onDelete() }
                 setOnLongClickListener { onClear(); true }
             },
@@ -43,13 +50,21 @@ class T9KeyboardView @JvmOverloads constructor(
         buttons.chunked(3).forEach { group ->
             val row = LinearLayout(context)
             group.forEach { button ->
-                button.isAllCaps = false
-                button.textSize = 15f
-                button.gravity = Gravity.CENTER
-                button.minWidth = 0
+                if (button is Button) {
+                    button.isAllCaps = false
+                    button.textSize = 15f
+                    button.gravity = Gravity.CENTER
+                    button.minWidth = 0
+                    rowHeight = maxOf(rowHeight, button.lineHeight * 2 + context.dp(12))
+                } else if (button is ImageButton) {
+                    button.scaleType = ImageView.ScaleType.CENTER
+                    button.imageTintList = android.content.res.ColorStateList.valueOf(context.getColor(R.color.text_primary))
+                    val background = android.util.TypedValue()
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackground, background, true)
+                    button.setBackgroundResource(background.resourceId)
+                }
                 button.minimumWidth = 0
                 button.setPadding(context.dp(2), context.dp(2), context.dp(2), context.dp(2))
-                rowHeight = maxOf(rowHeight, button.lineHeight * 2 + context.dp(12))
                 row.addView(button, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
             }
             addView(row, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
@@ -58,8 +73,8 @@ class T9KeyboardView @JvmOverloads constructor(
     }
 
     fun setHasInput(hasInput: Boolean) {
-        clear.isEnabled = hasInput
         delete.isEnabled = hasInput
+        delete.alpha = if (hasInput) 1f else 0.35f
     }
 
     fun fillHeight(fill: Boolean) {

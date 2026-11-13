@@ -21,12 +21,13 @@ import dev.sinan.launcher.apps.AppSnapshot
 import dev.sinan.search.T9SearchEngine
 import java.util.concurrent.Future
 
-class AppGridView @JvmOverloads constructor(context: Context, private val onLaunched: () -> Unit = {}) : LinearLayout(context) {
+class AppGridView @JvmOverloads constructor(context: Context, onSettings: () -> Unit = {}, private val onLaunched: () -> Unit = {}) : LinearLayout(context) {
     private val repository = (context.applicationContext as SinanApplication).apps
     private val status = TextView(context)
     private val retry = Button(context)
     private val queryDisplay = TextView(context)
     private val resultsColumn = LinearLayout(context).apply { orientation = VERTICAL }
+    private val keyboardColumn = LinearLayout(context).apply { orientation = VERTICAL }
     private val grid = object : GridView(context) {
         override fun dispatchTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
@@ -60,19 +61,20 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
         onDigit = { if (query.length < T9SearchEngine.MAX_QUERY_LENGTH) changeQuery(query + it) },
         onDelete = { changeQuery(query.dropLast(1)) },
         onClear = { changeQuery("") },
+        onSettings = onSettings,
     )
     private fun dp(value: Int) = context.dp(value)
 
     init {
         orientation = VERTICAL
-        queryDisplay.textSize = 14f
+        queryDisplay.textSize = 22f
         queryDisplay.setTextColor(context.getColor(R.color.text_primary))
         queryDisplay.minHeight = dp(44)
         queryDisplay.maxLines = 1
         queryDisplay.ellipsize = TextUtils.TruncateAt.START
         queryDisplay.setPadding(dp(8), dp(4), dp(8), dp(4))
-        queryDisplay.setText(R.string.input_hint)
-        resultsColumn.addView(queryDisplay)
+        queryDisplay.gravity = Gravity.CENTER
+        queryDisplay.contentDescription = context.getString(R.string.input_query, "")
         status.setTextColor(context.getColor(R.color.text_secondary))
         status.textSize = 13f
         status.setPadding(dp(8), dp(6), dp(8), dp(8))
@@ -109,7 +111,9 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
         }
         resultsColumn.addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(resultsColumn, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(keyboard, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        keyboardColumn.addView(queryDisplay)
+        keyboardColumn.addView(keyboard, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(keyboardColumn, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -123,7 +127,8 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
             orientation = if (horizontal) HORIZONTAL else VERTICAL
             horizontalKeys.width = minOf((w * 0.46f).toInt(), dp(240))
             resultsColumn.layoutParams = if (horizontal) horizontalResults else verticalResults
-            keyboard.layoutParams = if (horizontal) horizontalKeys else verticalKeys
+            keyboardColumn.layoutParams = if (horizontal) horizontalKeys else verticalKeys
+            keyboard.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, if (horizontal) 0 else LayoutParams.WRAP_CONTENT, if (horizontal) 1f else 0f)
             keyboard.fillHeight(horizontal)
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -150,6 +155,7 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
         searchTask?.cancel(true)
         grid.isEnabled = false
         retry.visibility = GONE
+        status.visibility = VISIBLE
         status.setText(R.string.loading_apps)
         load = repository.load { result ->
             if (generation != version || !isAttachedToWindow) return@load
@@ -157,6 +163,7 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
                 snapshot = it
                 search()
             }, onFailure = {
+                status.visibility = VISIBLE
                 status.setText(R.string.apps_failed)
                 retry.visibility = VISIBLE
             })
@@ -166,10 +173,8 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
     private fun changeQuery(value: String) {
         if (query == value) return
         query = value
-        queryDisplay.textSize = if (value.isEmpty()) 14f else 22f
-        queryDisplay.text = if (value.isEmpty()) context.getString(R.string.input_hint) else value
-        queryDisplay.contentDescription = if (value.isEmpty()) context.getString(R.string.input_hint)
-            else context.getString(R.string.input_query, value)
+        queryDisplay.text = value
+        queryDisplay.contentDescription = context.getString(R.string.input_query, value)
         keyboard.setHasInput(value.isNotEmpty())
         search()
     }
@@ -186,13 +191,8 @@ class AppGridView @JvmOverloads constructor(context: Context, private val onLaun
             adapter.notifyDataSetChanged()
             grid.setSelection(0)
             grid.isEnabled = true
-            status.text = when {
-                query.isNotEmpty() && found.isEmpty() -> context.getString(R.string.no_matches)
-                query.isNotEmpty() -> context.getString(R.string.matches_count, found.size)
-                found.isEmpty() -> context.getString(R.string.no_apps)
-                data.hasUsage -> context.getString(R.string.apps_usage_count, found.size)
-                else -> context.getString(R.string.apps_count, found.size)
-            }
+            status.setText(if (query.isEmpty()) R.string.no_apps else R.string.no_matches)
+            status.visibility = if (found.isEmpty()) VISIBLE else GONE
             retry.visibility = if (query.isEmpty() && found.isEmpty()) VISIBLE else GONE
         }
     }

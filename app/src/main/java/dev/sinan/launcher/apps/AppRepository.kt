@@ -30,7 +30,6 @@ class AppCatalog(val apps: List<LaunchableApp>) {
 class AppSnapshot(val catalog: AppCatalog, usageScores: Map<AppId, Double>) {
     val scores = usageScores.toMap()
     val apps = UsageRanker.order(catalog.apps.map { it.entry.id }, scores).mapNotNull { catalog.byId[it] }
-    val hasUsage = scores.values.any { it > 0 }
 }
 
 /** 当前资料的启动入口；包变更不改变已打开的网格快照。 */

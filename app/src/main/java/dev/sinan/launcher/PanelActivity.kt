@@ -10,12 +10,10 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Toast
 import dev.sinan.launcher.ui.AppGridView
 import dev.sinan.launcher.ui.dp
-import dev.sinan.launcher.ui.heading
 
 /** 透明前台宿主管理短生命周期的真实悬浮窗口，不启动常驻服务。 */
 class PanelActivity : Activity() {
@@ -40,18 +38,7 @@ class PanelActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(8))
         }
-        val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(heading().apply { setText(R.string.app_name) }, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(Button(this).apply {
-            setText(R.string.settings)
-            setOnClickListener { fallback() }
-        })
-        header.addView(Button(this).apply {
-            setText(R.string.close)
-            setOnClickListener { dialog.dismiss() }
-        })
-        root.addView(header)
-        root.addView(AppGridView(this) { dialog.dismiss() }, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(AppGridView(this, onSettings = { fallback() }, onLaunched = { dialog.dismiss() }), LinearLayout.LayoutParams(-1, 0, 1f))
         dialog.setContentView(root)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { if (!isFinishing) finish() }

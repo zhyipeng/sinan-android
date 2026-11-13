@@ -62,7 +62,7 @@ def main():
 
     def tap_text(text):
         nodes = own_nodes()
-        node = next((n for n in nodes if n.get("text") == text), None)
+        node = next((n for n in nodes if (n.get("text") == text or n.get("content-desc") == text)), None)
         assert node is not None, "找不到测试控件: " + text
         left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
         shell("input", "tap", str((left + right) // 2), str((top + bottom) // 2))
@@ -106,14 +106,18 @@ def main():
         points = {}
         for node in own_nodes():
             match = re.match(r"数字 ([0-9])，", node.get("content-desc", ""))
-            key = match.group(1) if match else node.get("text")
-            if key in list("0123456789") + ["清空", "退格"]:
+            key = match.group(1) if match else ("退格" if node.get("content-desc") == "退格，长按清空" else ("设置" if node.get("content-desc") == "设置" else node.get("text")))
+            if key in list("0123456789") + ["设置", "退格"]:
                 a, b, c, d = map(int, re.findall(r"\d+", node.get("bounds")))
                 points[key] = (str((a + c) // 2), str((b + d) // 2))
         assert len(points) == 12, "九宫格按键不可见"
 
         def tap(key):
             shell("input", "tap", *points[key])
+
+        def clear():
+            x, y = points["退格"]
+            shell("input", "swipe", x, y, x, y, "800")
 
         def digits(value):
             for digit in value:
@@ -123,7 +127,7 @@ def main():
             if value:
                 assert any(n.get("content-desc") == "搜索数字：" + value for n in own_nodes()), "查询未正确更新"
             else:
-                assert any(n.get("text") == "输入数字，快速找应用" for n in own_nodes()), "查询未清空"
+                assert any(n.get("content-desc") == "搜索数字：" for n in own_nodes()), "查询未清空"
 
         if check_editing:
             digits("10")
@@ -137,15 +141,24 @@ def main():
             assert_query("00000000")
             assert any(n.get("text") == "没有匹配，试试退格或清空" for n in own_nodes()), "无结果反馈缺失"
             shot("t9-no-results")
-            tap("清空")
+            clear()
             assert_query("")
             digits("25625")
-            tap("清空")
+            clear()
             digits("99999")
-            tap("清空")
+            clear()
         digits("25625")
         assert_query("25625")
         nodes = own_nodes()
+        assert any(n.get("class") == "android.widget.ImageButton" and n.get("content-desc") == "设置" for n in nodes), "设置未使用图标"
+        assert any(n.get("class") == "android.widget.ImageButton" and n.get("content-desc") == "退格，长按清空" for n in nodes), "退格未使用图标"
+        assert not any(n.get("text") == "输入数字，快速找应用" or "个应用，按" in n.get("text", "") or n.get("text", "").startswith("显示 ") for n in nodes), "多余提示或数量栏仍可见"
+        bounds = lambda n: tuple(map(int, re.findall(r"\d+", n.get("bounds"))))
+        query_bounds = bounds(next(n for n in nodes if n.get("content-desc") == "搜索数字：25625"))
+        key_bounds = bounds(next(n for n in nodes if n.get("content-desc", "").startswith("数字 1，")))
+        grid_bounds = bounds(next(n for n in nodes if n.get("class") == "android.widget.GridView"))
+        assert query_bounds[3] <= key_bounds[1], "数字未位于键盘上方"
+        assert grid_bounds[3] <= query_bounds[1] or grid_bounds[2] <= query_bounds[0], "数字栏与应用网格重叠"
         assert any(n.get("text") == "Clock" for n in nodes), "T9 未匹配 Clock"
         assert not any(n.get("text") == "Camera" for n in nodes), "网格仍包含不匹配应用"
         assert not any(n.get("class") == "android.widget.EditText" for n in nodes)
@@ -160,7 +173,7 @@ def main():
         tap_text("使用记录")
         tap_text("清空记录")
         wait(usage_removed, "使用记录未删除")
-        wait(lambda: any(n.get("text", "").endswith("按名称排列") for n in own_nodes()), "清空后未恢复名称顺序")
+        wait(lambda: first_app() == "Calendar", "清空后未恢复镜像的名称首项 Calendar")
 
     # 不把已有使用汇总读到电脑或输出中；备份只在应用自己的 no_backup 目录。
     stop()
@@ -215,6 +228,7 @@ def main():
         allowed("allow")
         stop()  # 推荐验证停留在普通页面，重新从桌面入口检查授权后的路由。
         open_overlay()
+        assert not any(n.get("text") in ["司南", "设置", "关闭"] for n in own_nodes()), "面板顶部控件未移除"
         shot("overlay")
         for _ in range(3):
             start()
@@ -222,8 +236,8 @@ def main():
         shell("input", "keyevent", "KEYCODE_BACK")
         check_closed()
         open_overlay()
-        heading = next(n for n in own_nodes() if n.get("text") == "司南")
-        left, top, right, _ = map(int, re.findall(r"\d+", heading.get("bounds")))
+        panel_root = own_nodes()[0]
+        left, top, right, _ = map(int, re.findall(r"\d+", panel_root.get("bounds")))
         # 横屏时导航栏可能在左侧，不能使用固定的屏幕坐标。
         shell("input", "tap", str((left + right) // 2), str(int(top * 0.4)))
         check_closed()

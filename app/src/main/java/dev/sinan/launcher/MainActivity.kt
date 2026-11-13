@@ -51,7 +51,7 @@ class MainActivity : Activity() {
             }
         }
         root.addView(permission, LinearLayout.LayoutParams(-1, -2))
-        grid = AppGridView(this) { finish() }
+        grid = AppGridView(this, onSettings = { showSettingsMenu() }, onLaunched = { finish() })
         root.addView(grid, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         root.setOnApplyWindowInsetsListener { view, insets ->
@@ -95,6 +95,15 @@ class MainActivity : Activity() {
     private fun openPanel() {
         startActivity(Intent(this, PanelActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         finish()
+    }
+
+    private fun showSettingsMenu() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings)
+            .setItems(arrayOf(getString(if (Settings.canDrawOverlays(this)) R.string.open_panel else R.string.allow_overlay), getString(R.string.usage_records))) { _, index ->
+                if (index == 1) showUsageRecords()
+                else if (Settings.canDrawOverlays(this)) openPanel() else requestOverlay()
+            }.show()
     }
 
     private fun showUsageRecords() {
