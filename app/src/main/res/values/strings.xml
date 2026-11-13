@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">司南</string>
+  <string name="app_description">按需唤出，快速找到并启动应用。</string>
+  <string name="scaffold_status">工程已建立\n\n后续将提供悬浮应用网格、内置九宫格拼音搜索和常用应用智能排序。\n\n当前为开发骨架，尚未接入应用搜索、悬浮面板和启动功能。</string>
+</resources>

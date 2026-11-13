@@ -1,0 +1,29 @@
+# Gradle / Android 构建产物
+.gradle/
+.kotlin/
+**/build/
+captures/
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+
+# 本机配置与编辑器状态
+local.properties
+.idea/
+*.iml
+.DS_Store
+*.log
+
+# 密钥、凭据与签名材料
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.key
+*.pem
+credentials*.json
+secrets*.properties
+keystore.properties
+signing.properties

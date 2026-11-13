@@ -1,0 +1,8 @@
+<resources>
+  <style name="Theme.Sinan" parent="android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:fontFamily">sans</item>
+    <item name="android:colorAccent">#346A56</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:windowBackground">@color/page_background</item>
+  </style>
+</resources>

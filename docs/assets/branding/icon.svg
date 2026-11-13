@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <defs>
+    <!-- Main Squircle Background -->
+    <linearGradient id="bg-grad" x1="180" y1="100" x2="844" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B70F7" />
+      <stop offset="52%" stop-color="#2954CE" />
+      <stop offset="100%" stop-color="#19348A" />
+    </linearGradient>
+
+    <!-- Top-Left Surface Sheen -->
+    <radialGradient id="bg-glow" cx="300" cy="180" r="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8AB4FF" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#8AB4FF" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Rim Highlight -->
+    <linearGradient id="rim-grad" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8FB7FF" />
+      <stop offset="30%" stop-color="#3B6EF5" />
+      <stop offset="100%" stop-color="#142A70" />
+    </linearGradient>
+
+    <!-- Dial Ring Solid Gradient (in local coordinates of translate(494, 494)) -->
+    <linearGradient id="ring-grad" x1="-220" y1="-220" x2="220" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C8DCFF" />
+      <stop offset="100%" stop-color="#7BA4FA" />
+    </linearGradient>
+
+    <!-- Search Handle Gradient (in local coordinates) -->
+    <linearGradient id="handle-grad" x1="210" y1="210" x2="284" y2="284" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8EB4FF" />
+      <stop offset="100%" stop-color="#6894F5" />
+    </linearGradient>
+  </defs>
+
+  <!-- Multi-step Smooth Drop Shadow -->
+  <rect x="84" y="104" width="856" height="856" rx="201" fill="#0B183D" fill-opacity="0.03" />
+  <rect x="88" y="106" width="848" height="848" rx="197" fill="#0B183D" fill-opacity="0.04" />
+  <rect x="92" y="108" width="840" height="840" rx="193" fill="#0B183D" fill-opacity="0.06" />
+  <rect x="96" y="110" width="832" height="832" rx="189" fill="#0B183D" fill-opacity="0.09" />
+  <rect x="100" y="112" width="824" height="824" rx="185" fill="#0B183D" fill-opacity="0.14" />
+
+  <!-- macOS Squircle Base (824x824) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-grad)" />
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-glow)" />
+  <rect x="102" y="102" width="820" height="820" rx="183" stroke="url(#rim-grad)" stroke-width="4" />
+
+  <!-- Core Motif: Search/Compass Dial + Command-Split Sinan Needle -->
+  <g transform="translate(494 494)">
+    <!-- Outer Compass & Search Ring -->
+    <circle cx="0" cy="0" r="254" stroke="url(#ring-grad)" stroke-width="34" />
+
+    <!-- Detached Search Launcher Handle (SE 45 deg, cleanly separated from ring) -->
+    <line x1="216" y1="216" x2="280" y2="280" stroke="url(#handle-grad)" stroke-width="40" stroke-linecap="round" />
+
+    <!-- Inner Cardinal Ticks -->
+    <g stroke="#8EB4FF" stroke-width="14" stroke-linecap="round">
+      <line x1="0" y1="-210" x2="0" y2="-186" />
+      <line x1="210" y1="0" x2="186" y2="0" />
+      <line x1="0" y1="210" x2="0" y2="186" />
+      <line x1="-210" y1="0" x2="-186" y2="0" />
+    </g>
+
+    <!-- Diamond Compass Needle with Command Chevron Split (45 deg NE) -->
+    <g transform="rotate(45)">
+      <!-- North Launch Tip (Sharp Command Arrowhead) -->
+      <path d="M 0 -214 L -88 14 L 0 -34 Z" fill="#FFFFFF" />
+      <path d="M 0 -214 L 88 14 L 0 -34 Z" fill="#D2E3FF" />
+
+      <!-- South Command Tail (Matching Diamond Contour with Chevron Gap `>`) -->
+      <path d="M -75 48 L 0 7 L 0 214 Z" fill="#92B9FF" />
+      <path d="M 75 48 L 0 7 L 0 214 Z" fill="#648FF0" />
+    </g>
+  </g>
+</svg>

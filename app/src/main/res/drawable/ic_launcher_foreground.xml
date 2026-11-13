@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 来自桌面版 icon.svg；缩放至自适应图标安全区域，保持原图形与颜色。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+  <group
+      android:pivotX="512"
+      android:pivotY="512"
+      android:scaleX="0.75"
+      android:scaleY="0.75">
+    <group android:translateX="494" android:translateY="494">
+      <path
+          android:pathData="M254,0A254,254 0,1 0,-254,0A254,254 0,1 0,254,0"
+          android:fillColor="@android:color/transparent"
+          android:strokeWidth="34">
+        <aapt:attr name="android:strokeColor">
+          <gradient
+              android:type="linear"
+              android:startX="-220"
+              android:startY="-220"
+              android:endX="220"
+              android:endY="220"
+              android:startColor="#C8DCFF"
+              android:endColor="#7BA4FA" />
+        </aapt:attr>
+      </path>
+      <path
+          android:pathData="M216,216L280,280"
+          android:strokeWidth="40"
+          android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+          <gradient
+              android:type="linear"
+              android:startX="210"
+              android:startY="210"
+              android:endX="284"
+              android:endY="284"
+              android:startColor="#8EB4FF"
+              android:endColor="#6894F5" />
+        </aapt:attr>
+      </path>
+      <path
+          android:pathData="M0,-210L0,-186M210,0L186,0M0,210L0,186M-210,0L-186,0"
+          android:strokeColor="#8EB4FF"
+          android:strokeWidth="14"
+          android:strokeLineCap="round" />
+      <group android:rotation="45">
+        <path android:pathData="M0,-214L-88,14L0,-34Z" android:fillColor="#FFFFFF" />
+        <path android:pathData="M0,-214L88,14L0,-34Z" android:fillColor="#D2E3FF" />
+        <path android:pathData="M-75,48L0,7L0,214Z" android:fillColor="#92B9FF" />
+        <path android:pathData="M75,48L0,7L0,214Z" android:fillColor="#648FF0" />
+      </group>
+    </group>
+  </group>
+</vector>
