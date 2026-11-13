@@ -4,7 +4,7 @@
 
 Kotlin + Android 原生 View，最低 API 26，编译与目标 API 36。当前工程实际只有 `app` 与 `core/search` 两个模块，不提前拆分大量 Gradle 模块。
 
-截至 2026-11-13，`app` 已实现 `AppRepository`、`AppGridView`、`MainActivity`、`PanelActivity` 和 `SinanTileService`；`core/search` 仍只有应用 ID、索引条目和搜索结果模型。下表为完整目标架构，未在上述实际组件中出现的部分仍是规划。
+截至 2026-11-13，`app` 已实现应用网格、九宫格、按需面板和磁贴；`core/search` 已有 `PinyinProvider` / `TinyPinyinProvider`、`T9SearchEngine` 和 JVM 测试。`AppGridView` 管理查询与结果代次，`AppRepository` 后台构建快照。下表仍包含尚未实现的行为采集与使用习惯排序组件。
 
 | 组件 | 职责与依赖边界 |
 | --- | --- |
@@ -17,7 +17,7 @@ Kotlin + Android 原生 View，最低 API 26，编译与目标 API 36。当前�
 | AppLauncher | 根据 profile + component 启动，处理失效入口与受限资料 |
 | EntryPoints | Activity、快捷方式、磁贴及可选悬浮球，共用唤出流程 |
 
-设置拟采用 DataStore；事件与聚合拟采用 Room。只有对应功能开始实现时才添加依赖。拼音库通过适配接口隔离，候选 TinyPinyin 需先验证词组、多音字、维护状态与许可证；不视为已采用。
+设置拟采用 DataStore；事件与聚合拟采用 Room，目前都未引入。拼音已采用 TinyPinyin 2.0.3 并由接口隔离，词组与许可范围见 [依赖说明](dependencies.md)。
 
 ## 数据流
 
@@ -75,8 +75,18 @@ T9 输入 → 匹配候选 → 等级排序 → 按 AppId 去重 → 网格
 - 磁贴由系统绑定 `TileService`，受 `BIND_QUICK_SETTINGS_TILE` 保护。API 34+ 使用 PendingIntent 重载收起通知栏并启动；API 26–33 才使用旧 Intent 重载。锁定状态通过 `unlockAndRun`，锁屏流程尚未专项验收。
 - `AppRepository` 仅访问 `Process.myUserHandle()`，从 `LauncherApps` 获取入口，再与最小 MAIN/LAUNCHER 查询相交，排除合成的应用详情页；不申请全量包查询或使用情况访问权限。
 - 文本扫描和图标加载使用两条后台工作线程；文本列表保留会话快照，图标 ConstantState 使用 48 项 LRU。包变化使下次打开时的快照失效，不在手指准备点击时重排当前网格。
-- 图标回调以绑定 ID 和视图代次防止异步错位，缓存同步命中允许在视图挂载前赋图。当前按系统名称排序，未记录任何启动历史或查询数据。
+- 图标回调以绑定 ID 和视图代次防止异步错位，缓存同步命中允许在视图挂载前赋图。无输入时按系统名称排序，未记录任何启动历史或查询数据。
 - 系统配置改变时清空文本和图标缓存；图标任务以索引代次检查，避免失效前的异步图标重新填入新缓存。
-- 首版界面采用图标品牌蓝 `#2954CE`、浅底 `#F5F7FC`、深底 `#151D30`、正文 `#192743` / `#EAF0FF`，原生字体；手机默认四列，宽屏六列。面板最大宽 560dp、高为宿主显示区域的 66%，横屏具体可用区域受系统/宿主约束。
+- 界面采用图标品牌蓝 `#2954CE`、浅底 `#F5F7FC`、深底 `#151D30`、正文 `#192743` / `#EAF0FF`，原生字体。网格随实际可用宽度适配 2–6 列；普通手机竖屏通常为四列。
 
 接口依据：[LauncherApps](https://developer.android.com/reference/android/content/pm/LauncherApps)、[WindowManager.LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams)、[TileService](https://developer.android.com/reference/android/service/quicksettings/TileService)。实际兼容结论以 [设备验证记录](validation-m1.md) 为限。
+
+## T9 接入（0.3.0）
+
+- `AppSnapshot` 将启动入口列表、按 AppId 的映射和只读 T9 索引一起发布。全部拼音转换与编码在后台扫描阶段完成，不在按键或图标绑定时重新转换。
+- 搜索独用一个后台执行器，与图标加载分开。查询最长 32 位，每次变化递增版本并取消旧任务，发布前同时核对视图代次和查询版本；新结果到达前暂时禁用网格点击。
+- 触摸按下时捕获 AppId 对应的条目和查询版本，避免旧触摸落在新结果的位置；启动处理中不发布新的结果。
+- 输入只使用 TextView 和应用内按键，不引入 EditText / 系统 IME。空查询恢复原名称顺序，非空查询按等级、可选同级分数、具体程度及稳定 ID 排序；当前没有真实使用分数。
+- `AppGridView` 在测量前决定上下或左右布局，重用 LayoutParams；横屏时结果区位于左侧、键盘位于右侧。按键行高由实际字体度量确定，覆盖 1.5 倍字体的两行数字/字母。
+- 面板最大宽 560dp，竖向显示区域使用 78% 高度，横向使用 90%。API 30+ 从应用上下文的 WindowMetrics 读取最大显示边界，旧版本使用显示器实际尺寸；可见期间注册 DisplayListener，关闭时解绑，防止兼容模式下旋转后继续沿用竖屏尺寸。
+- 未实现使用历史、查询日志、别名编辑、置顶或智能推荐，不增加网络或使用情况访问权限。

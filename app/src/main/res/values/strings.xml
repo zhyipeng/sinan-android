@@ -14,4 +14,11 @@
   <string name="launch_failed">应用暂时无法打开，已刷新应用列表。</string>
   <string name="permission_settings_failed">无法打开权限设置，你仍可使用下方应用网格。</string>
   <string name="overlay_failed">暂时无法显示悬浮面板，请使用应用网格。</string>
+  <string name="input_hint">输入数字，快速找应用</string>
+  <string name="input_query">搜索数字：%1$s</string>
+  <string name="input_clear">清空</string>
+  <string name="input_delete">退格</string>
+  <string name="t9_digit_description">数字 %1$s，%2$s</string>
+  <string name="no_matches">没有匹配，试试退格或清空</string>
+  <string name="matches_count">显示 %1$d 个匹配</string>
 </resources>

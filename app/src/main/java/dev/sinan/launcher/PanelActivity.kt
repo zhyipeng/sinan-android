@@ -3,7 +3,10 @@ package dev.sinan.launcher
 import android.app.Activity
 import android.app.Dialog
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -17,6 +20,14 @@ import dev.sinan.launcher.ui.heading
 /** 透明前台宿主管理短生命周期的真实悬浮窗口，不启动常驻服务。 */
 class PanelActivity : Activity() {
     private var panel: Dialog? = null
+    private var watchingDisplay = false
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            if (panel?.isShowing == true) resizePanel()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,8 +75,9 @@ class PanelActivity : Activity() {
                 return
             }
             dialog.show()
-            val metrics = resources.displayMetrics
-            dialog.window?.setLayout(minOf(metrics.widthPixels, dp(560)), (metrics.heightPixels * 0.66f).toInt())
+            resizePanel()
+            getSystemService(DisplayManager::class.java).registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
+            watchingDisplay = true
         } catch (_: SecurityException) {
             fallback()
         } catch (_: WindowManager.BadTokenException) {
@@ -75,12 +87,14 @@ class PanelActivity : Activity() {
     }
 
     override fun onStop() {
+        stopWatchingDisplay()
         if (isChangingConfigurations) panel?.setOnDismissListener(null)
         panel?.dismiss()
         super.onStop()
     }
 
     override fun onDestroy() {
+        stopWatchingDisplay()
         panel?.setOnDismissListener(null)
         panel?.dismiss()
         panel = null
@@ -90,5 +104,28 @@ class PanelActivity : Activity() {
     private fun fallback() {
         startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.SHOW_SETTINGS, true))
         finish()
+    }
+
+    private fun stopWatchingDisplay() {
+        if (watchingDisplay) getSystemService(DisplayManager::class.java).unregisterDisplayListener(displayListener)
+        watchingDisplay = false
+    }
+
+    private fun resizePanel() {
+        // 透明 Activity 在兼容模式下可能保持竖屏尺寸，使用显示区域边界并监听真实显示变化。
+        val bounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            applicationContext.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
+        } else {
+            @Suppress("DEPRECATION")
+            val display = applicationContext.getSystemService(WindowManager::class.java).defaultDisplay
+            val metrics = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            display.getRealMetrics(metrics)
+            android.graphics.Rect(0, 0, metrics.widthPixels, metrics.heightPixels)
+        }
+        val landscape = bounds.width() > bounds.height()
+        val width = minOf(bounds.width(), dp(560))
+        val height = (bounds.height() * if (landscape) 0.90f else 0.78f).toInt()
+        panel?.window?.let { if (it.attributes.width != width || it.attributes.height != height) it.setLayout(width, height) }
     }
 }

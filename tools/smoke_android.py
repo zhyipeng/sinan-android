@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在已启动的模拟器上验证 M1；不连接真机、不清除应用或模拟器数据。"""
+"""在已启动的模拟器上验证系统入口与 T9；不连接真机、不清除数据。"""
 import argparse
 import re
 import subprocess
@@ -91,6 +91,56 @@ def main():
         with (output / (name + ".png")).open("wb") as file:
             subprocess.run(adb + ["exec-out", "screencap", "-p"], stdout=file, check=True, timeout=15)
 
+    def search_clock(check_editing):
+        points = {}
+        for node in own_nodes():
+            match = re.match(r"数字 ([0-9])，", node.get("content-desc", ""))
+            key = match.group(1) if match else node.get("text")
+            if key in list("0123456789") + ["清空", "退格"]:
+                a, b, c, d = map(int, re.findall(r"\d+", node.get("bounds")))
+                points[key] = (str((a + c) // 2), str((b + d) // 2))
+        assert len(points) == 12, "九宫格按键不可见"
+
+        def tap(key):
+            shell("input", "tap", *points[key])
+
+        def digits(value):
+            for digit in value:
+                tap(digit)
+
+        def assert_query(value):
+            if value:
+                assert any(n.get("content-desc") == "搜索数字：" + value for n in own_nodes()), "查询未正确更新"
+            else:
+                assert any(n.get("text") == "输入数字，快速找应用" for n in own_nodes()), "查询未清空"
+
+        if check_editing:
+            digits("10")
+            assert_query("10")
+            tap("退格")
+            assert_query("1")
+            x, y = points["退格"]
+            shell("input", "swipe", x, y, x, y, "800")
+            assert_query("")
+            digits("00000000")
+            assert_query("00000000")
+            assert any(n.get("text") == "没有匹配，试试退格或清空" for n in own_nodes()), "无结果反馈缺失"
+            shot("t9-no-results")
+            tap("清空")
+            assert_query("")
+            digits("25625")
+            tap("清空")
+            digits("99999")
+            tap("清空")
+        digits("25625")
+        assert_query("25625")
+        nodes = own_nodes()
+        assert any(n.get("text") == "Clock" for n in nodes), "T9 未匹配 Clock"
+        assert not any(n.get("text") == "Camera" for n in nodes), "网格仍包含不匹配应用"
+        assert not any(n.get("class") == "android.widget.EditText" for n in nodes)
+        shot("t9-fallback-query" if check_editing else "t9-overlay-query")
+        print("PASS T9 过滤" + ("、0/1、退格/长按清空、无结果、快速改输" if check_editing else "（悬浮面板）"))
+
     try:
         stop()
         allowed("deny")
@@ -101,6 +151,7 @@ def main():
         tap_text("允许悬浮显示")
         wait(lambda: any("ResumedActivity" in line and "com.android.settings" in line for line in shell("dumpsys", "activity", "activities").splitlines()), "权限引导未进入设置")
         shell("input", "keyevent", "KEYCODE_BACK")
+        search_clock(check_editing=True)
         tap_text("Clock")
         wait(clock_open, "降级网格未启动 Clock")
         print("PASS 无权限降级、权限引导返回、网格启动")
@@ -123,6 +174,7 @@ def main():
         shell("input", "keyevent", "KEYCODE_HOME")
         check_closed()
         open_overlay()
+        search_clock(check_editing=False)
         tap_text("Clock")
         check_closed()
         wait(clock_open, "悬浮网格未启动 Clock")

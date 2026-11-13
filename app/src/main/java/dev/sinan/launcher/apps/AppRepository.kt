@@ -13,19 +13,26 @@ import android.os.UserManager
 import android.util.LruCache
 import dev.sinan.search.AppEntry
 import dev.sinan.search.AppId
+import dev.sinan.search.T9SearchEngine
 import java.text.Collator
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 data class LaunchableApp(val entry: AppEntry, val activity: LauncherActivityInfo)
 
+class AppSnapshot(val apps: List<LaunchableApp>) {
+    val index = T9SearchEngine(apps.map { it.entry })
+    val byId = apps.associateBy { it.entry.id }
+}
+
 /** 当前资料的启动入口；包变更不改变已打开的网格快照。 */
 class AppRepository(private val context: Context) {
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val worker = Executors.newFixedThreadPool(2)
+    private val searchWorker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val icons = LruCache<AppId, Drawable.ConstantState>(48)
-    @Volatile private var snapshot: List<LaunchableApp>? = null
+    @Volatile private var snapshot: AppSnapshot? = null
     @Volatile private var revision = 0
 
     init {
@@ -44,7 +51,7 @@ class AppRepository(private val context: Context) {
         icons.evictAll()
     }
 
-    fun load(callback: (Result<List<LaunchableApp>>) -> Unit): Future<*>? {
+    fun load(callback: (Result<AppSnapshot>) -> Unit): Future<*>? {
         snapshot?.let { callback(Result.success(it)); return null }
         return worker.submit {
             val version = revision
@@ -63,10 +70,15 @@ class AppRepository(private val context: Context) {
                     .sortedWith { a, b ->
                         collator.compare(a.entry.label, b.entry.label).takeIf { it != 0 }
                             ?: a.activity.componentName.flattenToString().compareTo(b.activity.componentName.flattenToString())
-                    }.also { if (version == revision) snapshot = it }
+                    }.let(::AppSnapshot).also { if (version == revision) snapshot = it }
             }
             main.post { callback(result) }
         }
+    }
+
+    fun search(data: AppSnapshot, query: String, callback: (List<LaunchableApp>) -> Unit): Future<*> = searchWorker.submit {
+        val results = if (query.isEmpty()) data.apps else data.index.search(query).mapNotNull { data.byId[it.app.id] }
+        if (!Thread.currentThread().isInterrupted) main.post { callback(results) }
     }
 
     fun loadIcon(app: LaunchableApp, callback: (Drawable?) -> Unit) {

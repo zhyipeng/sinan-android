@@ -126,11 +126,13 @@ class T9SearchEngineTest {
         assertEquals(builtCalls, calls)
     }
 
-    @Test fun longNamesDoNotEnumerateMixedCombinations() {
+    @Test(timeout = 5000) fun longNamesDoNotEnumerateMixedCombinations() {
         val entry = app("长名称").copy(pinyinVariants = listOf(List(128) { "chang" }))
         val engine = T9SearchEngine(listOf(entry))
         assertTrue(engine.search("242642".repeat(4)).isNotEmpty())
         assertTrue(engine.search("9".repeat(32)).isEmpty())
+        val ambiguous = T9SearchEngine(listOf(entry.copy(pinyinVariants = listOf(List(128) { "aa" }))))
+        assertFalse(ambiguous.search("2".repeat(32)).single().isComplete)
     }
 
     @Test fun benchmark300AppsReportsJvmCostWithoutDevicePerformanceClaims() {
