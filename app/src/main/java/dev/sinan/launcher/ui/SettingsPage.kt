@@ -41,6 +41,7 @@ class SettingsPage(activity: Activity, onBack: () -> Unit, actions: SettingsActi
             if (controller.isEnabled) controller.disable() else actions.explainBall()
         }
         column.addView(ballButton, LinearLayout.LayoutParams(-1, -2))
+        column.addView(BallAppearanceView(activity))
         addView(column)
         refresh()
     }

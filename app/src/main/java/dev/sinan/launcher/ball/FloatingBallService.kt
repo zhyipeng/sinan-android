@@ -16,7 +16,6 @@ import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
@@ -45,6 +44,9 @@ import kotlin.math.roundToInt
 class FloatingBallService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val controller get() = (application as SinanApplication).ball
+    private val appearance get() = (application as SinanApplication).ballAppearance
+    private var appliedStyle: BallStyle? = null
+    private val appearanceObserver: () -> Unit = { applyAppearance(); reconcile() }
     private val positions get() = (application as SinanApplication).ballPositions
     private val windows by lazy { getSystemService(WindowManager::class.java) }
     private var ball: ImageButton? = null
@@ -111,6 +113,8 @@ class FloatingBallService : Service() {
             else registerReceiver(screenReceiver, filter)
             getSystemService(DisplayManager::class.java).registerDisplayListener(displayListener, main)
             createBall()
+            appearance.observe(appearanceObserver)
+            applyAppearance()
             val revision = positionRevision
             positions.load {
                 if (started && revision == positionRevision) { position = it; place() }
@@ -143,10 +147,9 @@ class FloatingBallService : Service() {
 
     private fun createBall() {
         ball = ImageButton(this).apply {
-            setImageResource(R.drawable.ic_launcher_foreground)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(0, 0, 0, 0)
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xFF2954CE.toInt()) }
+            background = null
             elevation = dp(6).toFloat()
             contentDescription = getString(R.string.ball_description)
             setOnClickListener { openPanel() }
@@ -161,6 +164,16 @@ class FloatingBallService : Service() {
             }
         }
         place()
+    }
+
+    private fun applyAppearance() {
+        val value = appearance.current
+        if (appliedStyle != value.style) {
+            appliedStyle = value.style
+            ball?.setImageDrawable(BallStyleDrawable(this, value.style))
+        }
+        params.alpha = value.opacity / 100f
+        update()
     }
 
     /** 返回是否形成点击；消费触摸与无障碍 performClick 在监听器中统一处理。 */
@@ -250,7 +263,7 @@ class FloatingBallService : Service() {
         if (!controller.isEnabled || !Settings.canDrawOverlays(this) || !notificationsAvailable(this)) { stopSelf(); return }
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
         val interactive = getSystemService(PowerManager::class.java).isInteractive
-        val show = !controller.isPanelVisible && !locked && interactive
+        val show = appearance.isReady && !controller.isPanelVisible && !locked && interactive
         if (!show && attached) detach()
         else if (show && !attached) {
             try { windows.addView(ball, params); attached = true } catch (_: RuntimeException) { stopSelf() }
@@ -282,6 +295,8 @@ class FloatingBallService : Service() {
         started = false
         main.removeCallbacksAndMessages(null)
         controller.removeObserver(observer)
+        appearance.removeObserver(appearanceObserver)
+        appearance.flush()
         runCatching { getSystemService(AppOpsManager::class.java).stopWatchingMode(appOpsListener) }
         runCatching { unregisterReceiver(screenReceiver) }
         getSystemService(DisplayManager::class.java).unregisterDisplayListener(displayListener)

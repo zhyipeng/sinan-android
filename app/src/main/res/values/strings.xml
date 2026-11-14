@@ -36,4 +36,13 @@
   <string name="ball_description">司南悬浮球，点击打开面板，拖动贴边</string>
   <string name="ball_failed">暂时无法开启悬浮球，请检查权限后重试。</string>
   <string name="back_to_search">返回搜索</string>
+  <string name="ball_appearance">悬浮球外观</string>
+  <string name="ball_style_classic">经典</string>
+  <string name="ball_style_cursor">游标</string>
+  <string name="ball_style_polaris">北辰</string>
+  <string name="ball_style_jade">墨玉</string>
+  <string name="ball_style_seal">朱砂</string>
+  <string name="ball_appearance_value">%1$s
+透明度 %2$d%%</string>
+  <string name="ball_opacity_value">悬浮球透明度 %1$d%%</string>
 </resources>

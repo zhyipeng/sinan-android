@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""模拟器验证可选悬浮球；恢复权限、屏幕设置及原贴边位置，不读取使用记录。"""
+"""模拟器验证可选悬浮球；恢复权限、屏幕设置、原贴边位置和外观，不读取使用记录。"""
 import argparse
 import re
 import subprocess
@@ -15,9 +15,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
     parser.add_argument('--adb', default='adb')
+    parser.add_argument('--appearance', action='store_true', help='额外验证五款样式、透明度、保存及运行中切换')
     parser.add_argument('--panel-settings', action='store_true', help='通过面板内设置页开启/关闭')
     parser.add_argument('--apk', default='app/build/outputs/apk/debug/app-debug.apk')
     args = parser.parse_args()
+    if args.appearance: args.panel_settings = True
     adb = [args.adb, '-s', args.serial]
 
     def run(*cmd):
@@ -115,18 +117,83 @@ def main():
         with (output / (name + '.png')).open('wb') as file:
             subprocess.run(adb + ['exec-out', 'screencap', '-p'], stdout=file, check=True, timeout=15)
 
+    def find_visible(text=None, class_name=None):
+        for _ in range(6):
+            root = nodes()
+            found = next((n for n in root.iter('node') if
+                          (text is None or n.get('text') == text) and
+                          (class_name is None or n.get('class') == class_name)), None)
+            if found is not None:
+                a, b, c, d = map(int, re.findall(r'\d+', found.get('bounds')))
+                if c > a and d > b: return found
+            scroll = next(n for n in root.iter('node') if n.get('class') == 'android.widget.ScrollView' and n.get('package') == PACKAGE)
+            a, b, c, d = map(int, re.findall(r'\d+', scroll.get('bounds')))
+            # Overlay 下仍可能暴露桌面的滚动容器；在本应用控件内部滑动，避开系统手势边缘。
+            x = str((a + c) // 2)
+            sh('input', 'swipe', x, str(b + (d - b) * 3 // 4), x, str(b + (d - b) // 4), '400')
+        raise AssertionError('设置控件不可见')
+
+    def settings_top():
+        for _ in range(3):
+            root = nodes()
+            button = next((n for n in root.iter('node') if n.get('text') in ['开启悬浮球', '关闭悬浮球']), None)
+            if button is not None:
+                a, b, c, d = map(int, re.findall(r'\d+', button.get('bounds')))
+                if c > a and d > b: return
+            scroll = next(n for n in root.iter('node') if n.get('class') == 'android.widget.ScrollView' and n.get('package') == PACKAGE)
+            a, b, c, d = map(int, re.findall(r'\d+', scroll.get('bounds')))
+            x = str((a + c) // 2)
+            sh('input', 'swipe', x, str(b + (d - b) // 4), x, str(b + (d - b) * 3 // 4), '400')
+
+    def select_style(label):
+        tap_node(find_visible(label, 'android.widget.RadioButton'))
+        wait(lambda: any(n.get('text') == label and n.get('checked') == 'true' for n in nodes().iter('node')), '样式未选中')
+
+    def opacity():
+        node = find_visible(class_name='android.widget.SeekBar')
+        return int(re.search(r'(\d+)%', node.get('content-desc')).group(1))
+
+    def set_opacity(value):
+        node = find_visible(class_name='android.widget.SeekBar')
+        a, b, c, d = map(int, re.findall(r'\d+', node.get('bounds')))
+        x = a + 1 if value == 20 else c - 1 if value == 100 else (a + c) // 2
+        sh('input', 'tap', str(x), str((b + d) // 2))
+        wait(lambda: abs(opacity() - value) <= 1, '滑块透明度未更新')
+
     prefs = 'shared_prefs/floating-ball-position.xml'
+    appearance_prefs = 'shared_prefs/floating-ball-appearance.xml'
+    pref_files = [prefs, prefs + '.bak', appearance_prefs, appearance_prefs + '.bak']
     backup = 'shared_prefs/ball-smoke-backup'
     sh('am', 'force-stop', PACKAGE)
     sh('run-as', PACKAGE, 'mkdir', '-p', 'shared_prefs')
     sh('run-as', PACKAGE, 'mkdir', backup)  # 遗留备份时拒绝覆盖。
-    for path in [prefs, prefs + '.bak']:
+    for path in pref_files:
         if private_exists(path):
             sh('run-as', PACKAGE, 'cp', path, backup + '/' + Path(path).name)
     try:
         sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'allow')
+        if args.appearance:
+            for path in [appearance_prefs, appearance_prefs + '.bak']:
+                sh('run-as', PACKAGE, 'rm', '-f', path)
         start_settings()
         assert no_ball(), '默认不应开启悬浮球'
+        expected_opacity = None
+        if args.appearance:
+            assert opacity() == 100, '默认透明度不是 100%'
+            for label in ['经典', '游标', '北辰', '墨玉', '朱砂']:
+                select_style(label)
+                assert no_ball(), '选择样式擅自开启了球'
+            set_opacity(20); shot('appearance-20')
+            set_opacity(100); shot('appearance-100')
+            select_style('墨玉'); set_opacity(60)
+            expected_opacity = opacity()
+            sh('am', 'force-stop', PACKAGE)
+            start_settings()
+            wait(lambda: opacity() == expected_opacity, '透明度未跨进程保存')
+            assert any(n.get('text') == '墨玉' and n.get('checked') == 'true' for n in nodes().iter('node')), '样式未跨进程保存'
+            assert no_ball(), '外观保存后擅自开启了球'
+            settings_top()
+            print('PASS 五款样式、20%/100% 边界、预览、跨进程保存、修改不自启', flush=True)
         if api >= 33:
             sh('pm', 'revoke', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
             for flag in ['user-set', 'user-fixed']:
@@ -148,6 +215,21 @@ def main():
         assert 'foregroundId=1001' in details, '前台通知未注册'
         sh('input', 'keyevent', 'KEYCODE_HOME')
         wait(lambda: len(balls()) == 1, '离开应用后悬浮球消失')
+        if expected_opacity is not None:
+            match = re.search(r'alpha=([0-9.]+)', balls()[0])
+            assert match and abs(float(match.group(1)) - expected_opacity / 100) < 0.02, '保存透明度未应用到窗口'
+            tap_ball(); wait(lambda: len(panels()) == 1 and not balls(), '点球后面板未就绪'); tap('设置')
+            select_style('北辰'); set_opacity(20)
+            sh('input', 'keyevent', 'KEYCODE_HOME')
+            wait(lambda: len(balls()) == 1, '运行中切换后球未恢复')
+            match = re.search(r'alpha=([0-9.]+)', balls()[0])
+            assert match and abs(float(match.group(1)) - 0.2) < 0.01, '透明度未更新到运行中的球'
+            shot('appearance-live')
+            tap_ball(); wait(lambda: len(panels()) == 1 and not balls(), '点球后面板未就绪'); tap('设置')
+            select_style('朱砂'); set_opacity(100); settings_top()
+            sh('input', 'keyevent', 'KEYCODE_HOME')
+            wait(lambda: len(balls()) == 1, '切换朱砂样式失败')
+            print('PASS 运行中切换样式与透明度、20% 仍可点开、100% 仍可恢复', flush=True)
         shot('ball')
         tap_ball()
         wait(lambda: len(panels()) == 1 and not balls(), '球点击未打开唯一面板并隐藏球')
@@ -245,7 +327,7 @@ def main():
                 sh('settings', 'delete', 'system', key)
             else:
                 sh('settings', 'put', 'system', key, value)
-        for path in [prefs, prefs + '.bak']:
+        for path in pref_files:
             sh('run-as', PACKAGE, 'rm', '-f', path)
             saved_path = backup + '/' + Path(path).name
             if private_exists(saved_path):
@@ -253,7 +335,7 @@ def main():
         sh('run-as', PACKAGE, 'rmdir', backup)
         sh('rm', '-f', '/sdcard/sinan-ball-smoke.xml')
         start_settings()
-    print('全部通过；原权限、旋转及位置已恢复，悬浮球关闭。截图：', output, flush=True)
+    print('全部通过；原权限、旋转、位置与外观已恢复，悬浮球关闭。截图：', output, flush=True)
 
 
 if __name__ == '__main__':
