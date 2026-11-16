@@ -2,13 +2,18 @@ package dev.sinan.launcher.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.View
+import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -32,43 +37,107 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
-        setPadding(context.dp(4), context.dp(20), context.dp(4), context.dp(8))
-        addView(TextView(context).apply {
-            setText(R.string.ball_appearance)
-            textSize = 18f
-            setTextColor(context.getColor(R.color.text_primary))
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        })
-        val previewRow = LinearLayout(context).apply {
+        setPadding(context.dp(16), context.dp(16), context.dp(16), context.dp(16))
+        context.applyPillCard(
+            view = this,
+            radiusDp = 18,
+            fillColorRes = R.color.surface_elevated,
+            strokeColorRes = R.color.divider_subtle,
+        )
+
+        val headerRow = LinearLayout(context).apply {
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, context.dp(12), 0, context.dp(12))
         }
-        val stage = android.widget.FrameLayout(context).apply {
-            background = Checkerboard(context.dp(8))
+        headerRow.addView(TextView(context).apply {
+            setText(R.string.ball_appearance)
+            textSize = 16f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            setTextColor(context.getColor(R.color.text_primary))
+        }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        value.apply {
+            textSize = 12f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(context.getColor(R.color.brand_accent))
+            setPadding(context.dp(10), context.dp(4), context.dp(10), context.dp(4))
+            background = context.roundedShape(
+                fillColor = context.getColor(R.color.surface_tonal),
+                radiusDp = 12,
+            )
+        }
+        headerRow.addView(value, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+        addView(headerRow, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = context.dp(12)
+        })
+
+        val stage = FrameLayout(context).apply {
+            background = Checkerboard(
+                size = context.dp(8),
+                lightColor = context.getColor(R.color.checker_light),
+                darkColor = context.getColor(R.color.checker_dark),
+            )
+            foreground = context.roundedShape(
+                fillColor = Color.TRANSPARENT,
+                strokeColor = context.getColor(R.color.divider_subtle),
+                strokeWidthDp = 1,
+                radiusDp = 14,
+            )
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, context.dpF(14))
+                }
+            }
+            clipToOutline = true
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        stage.addView(preview, android.widget.FrameLayout.LayoutParams(context.dp(48), context.dp(48), Gravity.CENTER))
-        previewRow.addView(stage, LayoutParams(context.dp(72), context.dp(72)))
-        previewRow.addView(value.apply {
-            textSize = 15f
-            setTextColor(context.getColor(R.color.text_primary))
-            setPadding(context.dp(16), 0, 0, 0)
-        }, LayoutParams(0, -2, 1f))
-        addView(previewRow)
-        slider.min = 20
-        slider.max = 100
-        slider.progress = 100
-        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) store.opacity(progress)
-            }
-            override fun onStopTrackingTouch(seekBar: SeekBar) { store.flush() }
+        stage.addView(preview, FrameLayout.LayoutParams(context.dp(48), context.dp(48), Gravity.CENTER))
+        addView(stage, LayoutParams(LayoutParams.MATCH_PARENT, context.dp(84)).apply {
+            bottomMargin = context.dp(12)
         })
-        addView(slider, LayoutParams(-1, context.dp(48)))
-        BallStyle.entries.chunked(3).forEach { styles ->
-            val row = LinearLayout(context)
-            styles.forEach { style ->
+
+        slider.apply {
+            min = 20
+            max = 100
+            progress = 100
+            splitTrack = false
+            progressDrawable = context.getDrawable(R.drawable.seekbar_track)
+            thumb = context.getDrawable(R.drawable.seekbar_thumb)
+            setPadding(context.dp(12), context.dp(8), context.dp(12), context.dp(4))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    if (fromUser) store.opacity(progress)
+                }
+                override fun onStopTrackingTouch(seekBar: SeekBar) { store.flush() }
+            })
+        }
+        addView(slider, LayoutParams(LayoutParams.MATCH_PARENT, context.dp(40)))
+
+        val scaleRow = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            setPadding(context.dp(8), 0, context.dp(8), context.dp(12))
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        listOf(
+            R.string.ball_opacity_min to Gravity.START,
+            R.string.ball_opacity_mid to Gravity.CENTER_HORIZONTAL,
+            R.string.ball_opacity_max to Gravity.END,
+        ).forEach { (resId, align) ->
+            scaleRow.addView(TextView(context).apply {
+                setText(resId)
+                textSize = 11f
+                fontFeatureSettings = "tnum"
+                setTextColor(context.getColor(R.color.text_tertiary))
+                gravity = align
+            }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        }
+        addView(scaleRow, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        val gap = context.dp(8)
+        val rows = BallStyle.entries.chunked(3)
+        rows.forEachIndexed { rowIndex, styles ->
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+            styles.forEachIndexed { colIndex, style ->
                 val choice = RadioButton(context).apply {
                     id = View.generateViewId()
                     setButtonDrawable(null)
@@ -79,29 +148,46 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
                     setTextColor(context.getColor(R.color.text_primary))
                     setCompoundDrawablesWithIntrinsicBounds(null, BallStyleDrawable(context, style), null, null)
                     compoundDrawablePadding = context.dp(8)
-                    setPadding(context.dp(4), context.dp(8), context.dp(4), context.dp(8))
+                    setPadding(context.dp(4), context.dp(12), context.dp(4), context.dp(12))
                     background = selectionBackground()
+                    attachPressScale(0.96f)
                     setOnClickListener { store.select(style) }
                 }
                 choices[style] = choice
-                row.addView(choice, LayoutParams(0, -2, 1f).apply { setMargins(context.dp(2), context.dp(4), context.dp(2), 0) })
+                row.addView(choice, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (colIndex < 2) marginEnd = gap
+                })
             }
-            repeat(3 - styles.size) { row.addView(Space(context), LayoutParams(0, 1, 1f)) }
-            addView(row)
+            repeat(3 - styles.size) { colOffset ->
+                val index = styles.size + colOffset
+                row.addView(Space(context), LayoutParams(0, 1, 1f).apply {
+                    if (index < 2) marginEnd = gap
+                })
+            }
+            addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                if (rowIndex < rows.lastIndex) bottomMargin = gap
+            })
         }
         render()
     }
 
     private fun selectionBackground(): Drawable {
-        fun border(color: Int) = GradientDrawable().apply {
-            cornerRadius = context.dp(10).toFloat()
-            setColor(android.graphics.Color.TRANSPARENT)
-            setStroke(context.dp(2), color)
-        }
+        val checked = context.roundedShape(
+            fillColor = context.getColor(R.color.surface_tonal),
+            strokeColor = context.getColor(R.color.brand_accent),
+            strokeWidthDp = 2,
+            radiusDp = 14,
+        )
+        val idle = context.roundedShape(
+            fillColor = context.getColor(R.color.surface_subtle),
+            strokeColor = context.getColor(R.color.divider_subtle),
+            strokeWidthDp = 1,
+            radiusDp = 14,
+        )
         return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_checked), border(0xFF2954CE.toInt()))
-            addState(intArrayOf(android.R.attr.state_focused), border(0xFF2954CE.toInt()))
-            addState(intArrayOf(), border(android.graphics.Color.TRANSPARENT))
+            addState(intArrayOf(android.R.attr.state_checked), checked)
+            addState(intArrayOf(android.R.attr.state_focused), checked)
+            addState(intArrayOf(), idle)
         }
     }
 
@@ -112,30 +198,64 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
             preview.setImageDrawable(BallStyleDrawable(context, appearance.style))
         }
         preview.alpha = appearance.opacity / 100f
-        value.text = context.getString(R.string.ball_appearance_value, context.getString(appearance.style.label), appearance.opacity)
+        value.text = context.getString(
+            R.string.ball_appearance_value,
+            context.getString(appearance.style.label),
+            appearance.opacity,
+        )
         slider.isEnabled = store.isReady
         slider.progress = appearance.opacity
         slider.contentDescription = context.getString(R.string.ball_opacity_value, appearance.opacity)
-        choices.forEach { (style, choice) -> choice.isChecked = style == appearance.style; choice.isEnabled = store.isReady }
+        choices.forEach { (style, choice) ->
+            val selected = style == appearance.style
+            choice.isChecked = selected
+            choice.isEnabled = store.isReady
+            choice.setTextColor(context.getColor(if (selected) R.color.brand_accent else R.color.text_primary))
+            choice.typeface = Typeface.create("sans-serif-medium", if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
     }
 
-    override fun onAttachedToWindow() { super.onAttachedToWindow(); store.observe(observer); render() }
-    override fun onDetachedFromWindow() { store.flush(); store.removeObserver(observer); super.onDetachedFromWindow() }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        store.observe(observer)
+        render()
+    }
+
+    override fun onDetachedFromWindow() {
+        store.flush()
+        store.removeObserver(observer)
+        super.onDetachedFromWindow()
+    }
+
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
         if (visibility != VISIBLE && isAttachedToWindow) store.flush()
     }
 
-    private class Checkerboard(private val size: Int) : Drawable() {
+    private class Checkerboard(
+        private val size: Int,
+        private val lightColor: Int,
+        private val darkColor: Int,
+    ) : Drawable() {
         private val paint = Paint()
         override fun draw(canvas: Canvas) {
-            for (y in bounds.top until bounds.bottom step size) for (x in bounds.left until bounds.right step size) {
-                paint.color = if (((x - bounds.left) / size + (y - bounds.top) / size) % 2 == 0) 0xFFE4EAF3.toInt() else 0xFFF7F9FD.toInt()
-                canvas.drawRect(x.toFloat(), y.toFloat(), minOf(x + size, bounds.right).toFloat(), minOf(y + size, bounds.bottom).toFloat(), paint)
+            for (y in bounds.top until bounds.bottom step size) {
+                for (x in bounds.left until bounds.right step size) {
+                    paint.color = if (((x - bounds.left) / size + (y - bounds.top) / size) % 2 == 0) lightColor else darkColor
+                    canvas.drawRect(
+                        x.toFloat(),
+                        y.toFloat(),
+                        minOf(x + size, bounds.right).toFloat(),
+                        minOf(y + size, bounds.bottom).toFloat(),
+                        paint,
+                    )
+                }
             }
         }
+
         override fun setAlpha(alpha: Int) = Unit
-        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) = Unit
-        @Deprecated("Drawable API") override fun getOpacity() = PixelFormat.OPAQUE
+        override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+        @Deprecated("Drawable API")
+        override fun getOpacity() = PixelFormat.OPAQUE
     }
 }

@@ -1,7 +1,7 @@
 <resources>
   <string name="app_name">司南</string>
-  <string name="overlay_optional">直接点击应用即可启动。允许悬浮显示后，可在当前页面上方打开面板。</string>
-  <string name="overlay_enabled">悬浮显示已开启。下次点击司南图标即可打开面板。</string>
+  <string name="overlay_optional">点击下方应用即可启动。开启悬浮显示后，可在任意界面之上随时唤出面板。</string>
+  <string name="overlay_enabled">悬浮显示已就绪，点击桌面图标或快捷磁贴即可唤出面板。</string>
   <string name="allow_overlay">允许悬浮显示</string>
   <string name="open_panel">打开悬浮面板</string>
   <string name="settings">设置</string>
@@ -13,15 +13,20 @@
   <string name="permission_settings_failed">无法打开权限设置，你仍可使用下方应用网格。</string>
   <string name="overlay_failed">暂时无法显示悬浮面板，请使用应用网格。</string>
   <string name="input_query">搜索数字：%1$s</string>
+  <string name="input_clear_description">清空输入</string>
   <string name="t9_digit_description">数字 %1$s，%2$s</string>
   <string name="no_matches">没有匹配，试试退格或清空</string>
   <string name="usage_records">使用记录</string>
+  <string name="usage_records_subtitle">仅本机保留近 30 天启动汇总，不记录搜索词</string>
   <string name="usage_records_description">仅统计通过司南启动应用的请求。小时汇总和最近一次时间仅存于本机，保留近 30 天，使用司南时清理过期记录。搜索内容不记录。\n\n清空后会重新学习推荐顺序。</string>
   <string name="usage_clear">清空记录</string>
   <string name="usage_cleared">使用记录已清空</string>
   <string name="usage_clear_failed">暂时无法清空使用记录，请重试。</string>
   <string name="usage_unavailable">使用记录暂时不可用，可在设置中清空后重新学习。</string>
   <string name="input_delete_description">退格，长按清空</string>
+  <string name="ball_title">悬浮球</string>
+  <string name="ball_status_on">已开启 · 点击唤出面板，拖动自动贴边</string>
+  <string name="ball_status_off">已关闭 · 可开启跨应用悬浮入口</string>
   <string name="ball_enable">开启悬浮球</string>
   <string name="ball_disable">关闭悬浮球</string>
   <string name="ball_explanation">点击悬浮球打开搜索面板，拖动后自动贴边并记住位置。面板展开和锁屏时隐藏，收起或解锁后恢复。
@@ -42,7 +47,9 @@
   <string name="ball_style_polaris">北辰</string>
   <string name="ball_style_jade">墨玉</string>
   <string name="ball_style_seal">朱砂</string>
-  <string name="ball_appearance_value">%1$s
-透明度 %2$d%%</string>
+  <string name="ball_appearance_value">%1$s · 透明度 %2$d%%</string>
   <string name="ball_opacity_value">悬浮球透明度 %1$d%%</string>
+  <string name="ball_opacity_min">20%</string>
+  <string name="ball_opacity_mid">60%</string>
+  <string name="ball_opacity_max">100%</string>
 </resources>

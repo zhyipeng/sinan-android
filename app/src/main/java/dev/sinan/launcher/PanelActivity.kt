@@ -9,16 +9,18 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.view.View
-import android.view.KeyEvent
-import dev.sinan.launcher.ui.SettingsActions
-import dev.sinan.launcher.ui.SettingsPage
 import android.widget.LinearLayout
 import android.widget.Toast
 import dev.sinan.launcher.ui.AppGridView
+import dev.sinan.launcher.ui.SettingsActions
+import dev.sinan.launcher.ui.SettingsPage
 import dev.sinan.launcher.ui.dp
+import dev.sinan.launcher.ui.extractSystemInsets
+import dev.sinan.launcher.ui.roundedShape
 
 /** 透明前台宿主管理短生命周期的真实悬浮窗口，不启动常驻服务。 */
 class PanelActivity : Activity() {
@@ -46,20 +48,45 @@ class PanelActivity : Activity() {
         val dialog = Dialog(this, R.style.Theme_Sinan_Panel)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(8))
+            setPadding(dp(16), dp(8), dp(16), dp(12))
         }
-        settingsActions = SettingsActions(this, overlay = true,
+        val handleBar = FrameLayout(this).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            setPadding(0, dp(2), 0, dp(8))
+            addView(View(this@PanelActivity).apply {
+                background = roundedShape(fillColor = getColor(R.color.handle_bar), radiusDp = 2)
+            }, FrameLayout.LayoutParams(dp(36), dp(4), Gravity.CENTER))
+            setOnClickListener { dialog.dismiss() }
+        }
+        root.addView(handleBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        settingsActions = SettingsActions(
+            this,
+            overlay = true,
             onUsageCleared = { grid.refreshUsage() },
             onChanged = { if (::settingsPage.isInitialized) settingsPage.refresh() },
             beforeSystemUi = { systemUiPending = true; dialog.hide() },
-            onSystemUiFinished = { systemUiPending = false; if (!isFinishing) showPanel() })
+            onSystemUiFinished = { systemUiPending = false; if (!isFinishing) showPanel() },
+        )
         val pages = FrameLayout(this)
-        grid = AppGridView(this, onSettings = { setSettingsPage(true) }, onLaunched = { dialog.dismiss() })
-        settingsPage = SettingsPage(this, onBack = { setSettingsPage(false) }, actions = settingsActions)
-        pages.addView(grid, FrameLayout.LayoutParams(-1, -1))
-        pages.addView(settingsPage, FrameLayout.LayoutParams(-1, -1))
-        root.addView(pages, LinearLayout.LayoutParams(-1, 0, 1f))
-        setSettingsPage(savedInstanceState?.getBoolean("settings-page") ?: intent.getBooleanExtra(OPEN_SETTINGS, false))
+        grid = AppGridView(this, onSettings = { setSettingsPage(true, animate = true) }, onLaunched = { dialog.dismiss() })
+        settingsPage = SettingsPage(this, onBack = { setSettingsPage(false, animate = true) }, actions = settingsActions)
+        pages.addView(grid, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        pages.addView(settingsPage, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        root.addView(pages, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        setSettingsPage(savedInstanceState?.getBoolean("settings-page") ?: intent.getBooleanExtra(OPEN_SETTINGS, false), animate = false)
+
+        root.setOnApplyWindowInsetsListener { view, insets ->
+            val edges = extractSystemInsets(insets)
+            view.setPadding(
+                dp(16) + edges.left,
+                dp(8),
+                dp(16) + edges.right,
+                dp(12) + edges.bottom,
+            )
+            insets
+        }
+
         dialog.setContentView(root)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { if (!isFinishing) finish() }
@@ -77,11 +104,12 @@ class PanelActivity : Activity() {
         dialog.window?.apply {
             setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
             setGravity(Gravity.BOTTOM)
-            addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+            addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-            setDimAmount(0.28f)
+            setDimAmount(0.32f)
         }
         panel = dialog
+        root.requestApplyInsets()
     }
 
     override fun onPostResume() {
@@ -140,18 +168,29 @@ class PanelActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra(OPEN_SETTINGS, false)) setSettingsPage(true)
+        if (intent.getBooleanExtra(OPEN_SETTINGS, false)) setSettingsPage(true, animate = false)
     }
 
     private fun navigateBack() {
         if (settingsActions.dismissTopDialog()) return
-        if (showingSettings) setSettingsPage(false) else panel?.dismiss()
+        if (showingSettings) setSettingsPage(false, animate = true) else panel?.dismiss()
     }
 
-    private fun setSettingsPage(show: Boolean) {
+    private fun setSettingsPage(show: Boolean, animate: Boolean) {
         showingSettings = show
-        grid.visibility = if (show) View.GONE else View.VISIBLE
-        settingsPage.visibility = if (show) View.VISIBLE else View.GONE
+        grid.animate().cancel()
+        settingsPage.animate().cancel()
+        val incoming: View = if (show) settingsPage else grid
+        val outgoing: View = if (show) grid else settingsPage
+        outgoing.visibility = View.GONE
+        outgoing.alpha = 1f
+        incoming.visibility = View.VISIBLE
+        if (animate && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            incoming.alpha = 0f
+            incoming.animate().alpha(1f).setDuration(90).start()
+        } else {
+            incoming.alpha = 1f
+        }
         if (show) settingsPage.refresh()
     }
 
@@ -175,7 +214,9 @@ class PanelActivity : Activity() {
         watchingDisplay = false
     }
 
-    companion object { const val OPEN_SETTINGS = "dev.sinan.launcher.OPEN_PANEL_SETTINGS" }
+    companion object {
+        const val OPEN_SETTINGS = "dev.sinan.launcher.OPEN_PANEL_SETTINGS"
+    }
 
     private fun resizePanel() {
         // 透明 Activity 在兼容模式下可能保持竖屏尺寸，使用显示区域边界并监听真实显示变化。
@@ -191,7 +232,7 @@ class PanelActivity : Activity() {
         }
         val landscape = bounds.width() > bounds.height()
         val width = minOf(bounds.width(), dp(560))
-        val height = (bounds.height() * if (landscape) 0.90f else 0.78f).toInt()
+        val height = (bounds.height() * if (landscape) 0.90f else 0.79f).toInt()
         panel?.window?.let { if (it.attributes.width != width || it.attributes.height != height) it.setLayout(width, height) }
     }
 }

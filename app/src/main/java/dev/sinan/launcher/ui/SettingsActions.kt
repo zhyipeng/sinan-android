@@ -25,13 +25,23 @@ class SettingsActions(
     private var notificationRequested = false
     private val dialogs = mutableSetOf<AlertDialog>()
 
-    private fun AlertDialog.Builder.showOwned() {
+    private fun AlertDialog.Builder.showOwned(destructive: Boolean = false) {
         val dialog = create()
         if (overlay) dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
         dialogs.add(dialog)
         dialog.setOnDismissListener { dialogs.remove(dialog) }
         dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+            isAllCaps = false
+            setTextColor(activity.getColor(if (destructive) R.color.danger_accent else R.color.brand_accent))
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+            isAllCaps = false
+            setTextColor(activity.getColor(R.color.text_secondary))
+        }
     }
+
+    private fun dialogBuilder(): AlertDialog.Builder = AlertDialog.Builder(activity, R.style.Theme_Sinan_Dialog)
 
     val hasDialogs get() = dialogs.any { it.isShowing }
     fun dismissTopDialog(): Boolean {
@@ -52,7 +62,7 @@ class SettingsActions(
     }
 
     fun explainBall() {
-        AlertDialog.Builder(activity)
+        dialogBuilder()
             .setTitle(R.string.ball_enable)
             .setMessage(R.string.ball_explanation)
             .setNegativeButton(android.R.string.cancel, null)
@@ -84,7 +94,7 @@ class SettingsActions(
     }
 
     private fun notificationSettings() {
-        AlertDialog.Builder(activity)
+        dialogBuilder()
             .setMessage(R.string.ball_notification_needed)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.ball_notification_settings) { _, _ ->
@@ -95,7 +105,7 @@ class SettingsActions(
                     onSystemUiFinished()
                     Toast.makeText(activity, R.string.ball_failed, Toast.LENGTH_LONG).show()
                 }
-            }.showOwned()
+            }.showOwned(destructive = true)
     }
 
     fun onPermissionResult(requestCode: Int, grantResults: IntArray) {
@@ -107,7 +117,7 @@ class SettingsActions(
     }
 
     fun showUsageRecords() {
-        AlertDialog.Builder(activity)
+        dialogBuilder()
             .setTitle(R.string.usage_records)
             .setMessage(R.string.usage_records_description)
             .setNegativeButton(android.R.string.cancel, null)
@@ -119,7 +129,7 @@ class SettingsActions(
                         onUsageCleared()
                     }, onFailure = { Toast.makeText(activity, R.string.usage_clear_failed, Toast.LENGTH_LONG).show() })
                 }
-            }.showOwned()
+            }.showOwned(destructive = true)
     }
 
     companion object { private const val BALL_NOTIFICATION_REQUEST = 210 }

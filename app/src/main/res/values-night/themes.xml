@@ -1,14 +1,24 @@
 <resources>
   <style name="Theme.Sinan" parent="android:style/Theme.Material.NoActionBar">
-    <item name="android:fontFamily">sans</item>
-    <item name="android:colorAccent">#A8C2FF</item>
+    <item name="android:fontFamily">sans-serif</item>
+    <item name="android:colorAccent">@color/brand_accent</item>
     <item name="android:windowLightStatusBar">false</item>
     <item name="android:windowBackground">@color/page_background</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
   </style>
   <style name="Theme.Sinan.Panel" parent="android:style/Theme.Material.Dialog.NoActionBar">
+    <item name="android:fontFamily">sans-serif</item>
     <item name="android:windowBackground">@drawable/panel_background</item>
-    <item name="android:colorAccent">#A8C2FF</item>
+    <item name="android:colorAccent">@color/brand_accent</item>
     <item name="android:windowMinWidthMajor">100%</item>
     <item name="android:windowMinWidthMinor">100%</item>
+  </style>
+  <style name="Theme.Sinan.Dialog" parent="android:style/Theme.Material.Dialog.Alert">
+    <item name="android:fontFamily">sans-serif</item>
+    <item name="android:windowBackground">@drawable/dialog_background</item>
+    <item name="android:colorAccent">@color/brand_accent</item>
+    <item name="android:textColorPrimary">@color/text_primary</item>
+    <item name="android:textColorSecondary">@color/text_secondary</item>
   </style>
 </resources>
