@@ -192,8 +192,17 @@ class MainActivity : Activity() {
         if (!intent.getBooleanExtra(SHOW_SETTINGS, false) && Settings.canDrawOverlays(this)) openPanel()
     }
 
+    private var cancelBallRestore: () -> Unit = {}
+
+    override fun onPause() {
+        cancelBallRestore()
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        cancelBallRestore()
+        cancelBallRestore = (application as SinanApplication).ball.restoreWhenReady()
         if (::permission.isInitialized) {
             val allowed = Settings.canDrawOverlays(this)
             permission.setText(if (allowed) R.string.open_panel else R.string.allow_overlay)
@@ -234,6 +243,7 @@ class MainActivity : Activity() {
                     getString(R.string.usage_records),
                     getString(if (ball.isEnabled) R.string.ball_disable else R.string.ball_enable),
                     getString(R.string.layout_settings),
+                    getString(R.string.ball_background),
                 ),
             ) { _, index ->
                 when (index) {
@@ -241,6 +251,7 @@ class MainActivity : Activity() {
                     1 -> settingsActions.showUsageRecords()
                     2 -> if (ball.isEnabled) ball.disable() else settingsActions.explainBall()
                     3 -> settingsActions.showLayoutSettings()
+                    4 -> settingsActions.showBallBackgroundSettings()
                 }
             }.show()
     }

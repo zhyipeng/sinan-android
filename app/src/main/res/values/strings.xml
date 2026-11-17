@@ -31,9 +31,9 @@
   <string name="ball_disable">关闭悬浮球</string>
   <string name="ball_explanation">点击悬浮球打开搜索面板，拖动后自动贴边并记住位置。面板展开和锁屏时隐藏，收起或解锁后恢复。
 
-开启期间会显示通知，可在通知或设置中关闭。需要悬浮显示与通知权限；进程结束后需手动重新开启。</string>
+通知可用时显示运行状态，可在通知或司南设置中关闭悬浮球。需要悬浮显示权限；通知可提供快捷关闭入口。开启状态会保存，系统终止进程或重启设备后尝试恢复。</string>
   <string name="ball_overlay_needed">请先允许悬浮显示，返回后重新开启悬浮球。</string>
-  <string name="ball_notification_needed">请允许司南通知，以显示悬浮球状态和关闭入口；返回后可重新开启。</string>
+  <string name="ball_notification_needed">允许通知后可查看悬浮球状态并快捷关闭；通知关闭时仍可从司南设置关闭悬浮球。</string>
   <string name="ball_notification_settings">通知设置</string>
   <string name="ball_channel">悬浮球运行状态</string>
   <string name="ball_notification_title">司南悬浮球已开启</string>
@@ -64,4 +64,12 @@
   <string name="grid_columns_value">%1$d 列</string>
   <string name="layout_percent">%1$d%%</string>
   <string name="layout_dp">%1$d dp</string>
+  <string name="ball_notification_optional">通知未开启，悬浮球仍可使用；可从司南设置关闭。</string>
+  <string name="ball_background">悬浮球后台运行设置</string>
+  <string name="ball_battery_settings">电池优化：前往设置</string>
+  <string name="ball_battery_exempt">电池优化：已不受限制（查看）</string>
+  <string name="ball_vendor_settings">应用详情与自启动</string>
+  <string name="ball_vendor_instructions">如悬浮球被系统清理，可在应用详情中允许后台运行，并将电池策略设为不限制。小米 / HyperOS 等设备还需在系统设置中允许司南自启动，具体入口因系统版本而异。
+
+仅已开启的悬浮球会在开机后尝试恢复。划掉最近任务不会主动关闭；强行停止、系统限制或厂商清理仍可能阻止恢复。关闭悬浮球后不再自动恢复。</string>
 </resources>

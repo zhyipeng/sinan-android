@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""模拟器验证可选悬浮球；恢复权限、屏幕设置、原贴边位置和外观，不读取使用记录。"""
+"""模拟器验证可选悬浮球；恢复权限、屏幕设置、原开关、贴边位置和外观，不读取使用记录。"""
 import argparse
 import re
 import subprocess
@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
     parser.add_argument('--adb', default='adb')
+    parser.add_argument('--reboot', action='store_true', help='额外重启模拟器验证开机恢复与关闭后不恢复')
     parser.add_argument('--appearance', action='store_true', help='额外验证五款样式、透明度、保存及运行中切换')
     parser.add_argument('--panel-settings', action='store_true', help='通过面板内设置页开启/关闭')
     parser.add_argument('--apk', default='app/build/outputs/apk/debug/app-debug.apk')
@@ -28,8 +29,11 @@ def main():
     def sh(*cmd):
         return run('shell', *cmd)
 
-    def wait(predicate, message):
-        deadline = time.monotonic() + 15
+    def process_pid():
+        return subprocess.run(adb + ['shell', 'pidof', PACKAGE], text=True, capture_output=True, timeout=15).stdout.strip()
+
+    def wait(predicate, message, timeout=15):
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if predicate():
                 return
@@ -162,7 +166,8 @@ def main():
 
     prefs = 'shared_prefs/floating-ball-position.xml'
     appearance_prefs = 'shared_prefs/floating-ball-appearance.xml'
-    pref_files = [prefs, prefs + '.bak', appearance_prefs, appearance_prefs + '.bak']
+    state_prefs = 'shared_prefs/floating-ball-state.xml'
+    pref_files = [prefs, prefs + '.bak', appearance_prefs, appearance_prefs + '.bak', state_prefs, state_prefs + '.bak']
     backup = 'shared_prefs/ball-smoke-backup'
     sh('am', 'force-stop', PACKAGE)
     sh('run-as', PACKAGE, 'mkdir', '-p', 'shared_prefs')
@@ -171,6 +176,8 @@ def main():
         if private_exists(path):
             sh('run-as', PACKAGE, 'cp', path, backup + '/' + Path(path).name)
     try:
+        for path in [state_prefs, state_prefs + '.bak']:
+            sh('run-as', PACKAGE, 'rm', '-f', path)
         sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'allow')
         if args.appearance:
             for path in [appearance_prefs, appearance_prefs + '.bak']:
@@ -201,11 +208,12 @@ def main():
             enable()
             deny = next(n for n in nodes().iter('node') if n.get('resource-id', '').endswith('/permission_deny_button'))
             tap_node(deny)
-            assert no_ball(), '通知拒绝后仍启动了服务'
-            enable()
-            allow = next(n for n in nodes().iter('node') if n.get('resource-id', '').endswith('/permission_allow_button'))
-            tap_node(allow)
-            print('PASS 按需通知授权、拒绝不启用、再次授权', flush=True)
+            sh('input', 'keyevent', 'KEYCODE_HOME')
+            wait(lambda: len(balls()) == 1 and service(), '通知拒绝后悬浮球未降级运行')
+            sh('pm', 'grant', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
+            sh('pm', 'set-permission-flags', PACKAGE, 'android.permission.POST_NOTIFICATIONS', 'user-set')
+            time.sleep(2)  # PermissionManager 异步落盘，避免立即重启丢失测试授权。
+            print('PASS 按需通知授权、拒绝仍可使用悬浮球', flush=True)
         else:
             enable()
         sh('input', 'keyevent', 'KEYCODE_HOME')
@@ -248,21 +256,35 @@ def main():
         sh('input', 'keyevent', 'KEYCODE_HOME')
         wait(lambda: len(balls()) == 1, '关闭后未重新开启')
         wait(lambda: abs(ball_bounds()[1] - saved[1]) < 8 and abs(ball_bounds()[0] - saved[0]) < 8, '重开位置未保留')
-        # API 29 镜像的 run-as 调试域拒绝发送 SIGKILL；该镜像改用强制停止。
-        # API 35 使用真实 SIGKILL，检查服务自身的 NOT_STICKY 行为。
         if api >= 30:
-            pid = sh('pidof', PACKAGE)
+            pid = process_pid()
             assert pid.isdigit()
             subprocess.run(adb + ['shell', 'run-as', PACKAGE, 'sh', '-c', "'kill -9 " + pid + "'"], capture_output=True, timeout=15, check=True)
+            wait(lambda: process_pid() != pid and len(balls()) == 1 and service(), '进程被杀后系统未恢复悬浮球', timeout=90)
+            print('PASS SIGKILL 后 START_STICKY 自动恢复', flush=True)
         else:
             sh('am', 'force-stop', PACKAGE)
-        wait(no_ball, '进程被杀后未清理球与服务')
-        time.sleep(2)
-        assert no_ball(), '进程被杀后服务自动拉起'
-        start_settings(); assert no_ball(), '重新打开应用时擅自恢复球'
-        enable(); sh('input', 'keyevent', 'KEYCODE_HOME'); wait(lambda: len(balls()) == 1, '进程重建后手动开启失败')
+            start_settings()
+            sh('input', 'keyevent', 'KEYCODE_HOME')
+            wait(lambda: len(balls()) == 1, '前台重开未恢复已开启的球')
         wait(lambda: abs(ball_bounds()[1] - saved[1]) < 8 and abs(ball_bounds()[0] - saved[0]) < 8, '跨进程位置未保留')
-        print('PASS 拖动贴边不误触、设置关闭、跨进程位置保留、被杀不自启', flush=True)
+        print('PASS 拖动贴边不误触、设置关闭、跨进程开关与位置保留', flush=True)
+
+        if api >= 33:
+            sh('pm', 'revoke', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
+            wait(lambda: len(balls()) == 1 and service(), '关闭通知后球或服务停止')
+            sh('pm', 'grant', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
+            sh('pm', 'set-permission-flags', PACKAGE, 'android.permission.POST_NOTIFICATIONS', 'user-set')
+            time.sleep(2)  # PermissionManager 异步落盘，避免立即重启丢失测试授权。
+            print('PASS 运行中撤销通知权限仍保留球', flush=True)
+
+        if args.reboot:
+            run('reboot')
+            run('wait-for-device')
+            wait(lambda: sh('getprop', 'sys.boot_completed') == '1', '模拟器未完成启动', timeout=90)
+            sh('input', 'keyevent', 'KEYCODE_WAKEUP'); sh('wm', 'dismiss-keyguard')
+            wait(lambda: len(balls()) == 1 and service(), '开机未自动恢复已开启的球', timeout=60)
+            print('PASS 真实重启后 BOOT_COMPLETED 恢复', flush=True)
 
         sh('input', 'keyevent', 'KEYCODE_SLEEP')
         wait(lambda: not balls() and service(), '锁屏时球未隐藏或服务丢失')
@@ -285,7 +307,12 @@ def main():
         if api == 29:
             sh('wm', 'set-user-rotation', 'lock', '0')
         time.sleep(1)
+        if api >= 33:
+            # 再确认当前授权，通知拒绝降级的测试已在前面独立覆盖。
+            sh('pm', 'grant', PACKAGE, 'android.permission.POST_NOTIFICATIONS')
+        sh('am', 'start', '-W', '-n', PACKAGE + '/.MainActivity', '--ez', PACKAGE + '.SHOW_SETTINGS', 'true')
         sh('cmd', 'statusbar', 'expand-notifications')
+        wait(lambda: any(n.get('text') in ['司南悬浮球已开启', '关闭悬浮球'] for n in nodes().iter('node')), '运行通知未显示', timeout=30)
         root = nodes()
         if not any(n.get('text') == '关闭悬浮球' for n in root.iter('node')):
             parents = {child: parent for parent in root.iter('node') for child in parent}
@@ -299,7 +326,20 @@ def main():
         tap('关闭悬浮球')
         wait(no_ball, '通知关闭后资源未释放')
         sh('cmd', 'statusbar', 'collapse')
-        print('PASS 通知关闭入口', flush=True)
+        time.sleep(1)
+        sh('am', 'force-stop', PACKAGE)
+        start_settings()
+        sh('input', 'keyevent', 'KEYCODE_HOME')
+        assert no_ball(), '主动关闭后跨进程重开仍恢复球'
+        if args.reboot:
+            run('reboot')
+            run('wait-for-device')
+            wait(lambda: sh('getprop', 'sys.boot_completed') == '1', '模拟器未完成启动', timeout=90)
+            sh('input', 'keyevent', 'KEYCODE_WAKEUP'); sh('wm', 'dismiss-keyguard')
+            time.sleep(3)
+            assert no_ball(), '主动关闭后开机仍自动恢复球'
+            print('PASS 主动关闭后真实重启不恢复', flush=True)
+        print('PASS 通知关闭入口、主动关闭跨进程保留', flush=True)
 
         enable(); sh('input', 'keyevent', 'KEYCODE_HOME'); wait(lambda: len(balls()) == 1, '再次开启失败')
         sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'deny')
@@ -308,7 +348,7 @@ def main():
         start_settings(); assert no_ball(), '权限恢复后擅自重新开启'
         print('PASS 悬浮权限撤销清理、恢复权限后不自启', flush=True)
     except Exception:
-        print('诊断：', sh('pidof', PACKAGE) if service() else '无球服务', flush=True)
+        print('诊断：', process_pid() if service() else '无球服务', flush=True)
         print('服务状态：', '\n'.join(line.strip() for line in sh('dumpsys', 'activity', 'services', PACKAGE).splitlines() if any(key in line for key in ['FloatingBallService', 'isForeground=', 'startRequested=', 'restart', 'Restart'])), flush=True)
         print('前台：', '\n'.join(line.strip() for line in sh('dumpsys', 'activity', 'activities').splitlines() if 'ResumedActivity' in line), flush=True)
         shot('failure')
@@ -335,7 +375,7 @@ def main():
         sh('run-as', PACKAGE, 'rmdir', backup)
         sh('rm', '-f', '/sdcard/sinan-ball-smoke.xml')
         start_settings()
-    print('全部通过；原权限、旋转、位置与外观已恢复，悬浮球关闭。截图：', output, flush=True)
+    print('全部通过；原权限、旋转、开关、位置与外观已恢复，悬浮球关闭。截图：', output, flush=True)
 
 
 if __name__ == '__main__':

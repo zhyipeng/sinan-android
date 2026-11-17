@@ -78,9 +78,11 @@ class SettingsActions(
         }
         if (Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             if (notificationRequested && !activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                notificationSettings()
+                FloatingBallService.ensureChannel(activity)
+                (activity.application as SinanApplication).ball.enable()
+                onChanged()
             } else {
-                // 同一设置会话内拒绝后可转到系统通知设置，不保存开启状态。
+                // 仅在明确开启时请求通知；拒绝后仍可运行，并保留设置中的关闭入口。
                 notificationRequested = true
                 beforeSystemUi()
                 activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), BALL_NOTIFICATION_REQUEST)
@@ -88,7 +90,6 @@ class SettingsActions(
             return
         }
         FloatingBallService.ensureChannel(activity)
-        if (!FloatingBallService.notificationsAvailable(activity)) { notificationSettings(); return }
         (activity.application as SinanApplication).ball.enable()
         onChanged()
     }
@@ -111,8 +112,12 @@ class SettingsActions(
     fun onPermissionResult(requestCode: Int, grantResults: IntArray) {
         if (requestCode != BALL_NOTIFICATION_REQUEST) return
         onSystemUiFinished()
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED && !activity.isFinishing) enableBall()
-        else Toast.makeText(activity, R.string.ball_notification_needed, Toast.LENGTH_LONG).show()
+        if (!activity.isFinishing) {
+            FloatingBallService.ensureChannel(activity)
+            (activity.application as SinanApplication).ball.enable()
+            if (grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED)
+                Toast.makeText(activity, R.string.ball_notification_optional, Toast.LENGTH_LONG).show()
+        }
         onChanged()
     }
 
@@ -138,6 +143,38 @@ class SettingsActions(
         }
         dialogBuilder().setTitle(R.string.layout_settings).setView(content)
             .setPositiveButton(android.R.string.ok, null).showOwned()
+    }
+
+    fun showBallBackgroundSettings() {
+        val exempt = activity.getSystemService(android.os.PowerManager::class.java)
+            .isIgnoringBatteryOptimizations(activity.packageName)
+        dialogBuilder().setTitle(R.string.ball_background)
+            .setItems(arrayOf(
+                activity.getString(if (exempt) R.string.ball_battery_exempt else R.string.ball_battery_settings),
+                activity.getString(R.string.ball_vendor_settings),
+                activity.getString(R.string.ball_notification_settings),
+            )) { _, index ->
+                when (index) {
+                    0 -> openBackgroundSettings(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    1 -> dialogBuilder().setMessage(R.string.ball_vendor_instructions)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(R.string.ball_vendor_settings) { _, _ ->
+                            openBackgroundSettings(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.parse("package:${activity.packageName}")))
+                        }.showOwned()
+                    2 -> notificationSettings()
+                }
+            }.showOwned()
+    }
+
+    private fun openBackgroundSettings(intent: Intent) {
+        try {
+            beforeSystemUi()
+            activity.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            onSystemUiFinished()
+            Toast.makeText(activity, R.string.permission_settings_failed, Toast.LENGTH_LONG).show()
+        }
     }
 
     companion object { private const val BALL_NOTIFICATION_REQUEST = 210 }

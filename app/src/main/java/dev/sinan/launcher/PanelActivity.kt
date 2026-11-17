@@ -123,8 +123,17 @@ class PanelActivity : Activity() {
         root.requestApplyInsets()
     }
 
+    private var cancelBallRestore: () -> Unit = {}
+
+    override fun onPause() {
+        cancelBallRestore()
+        super.onPause()
+    }
+
     override fun onPostResume() {
         super.onPostResume()
+        cancelBallRestore()
+        cancelBallRestore = (application as SinanApplication).ball.restoreWhenReady()
         if (::settingsPage.isInitialized) settingsPage.refresh()
         systemUiPending = false
         showPanel()

@@ -40,7 +40,7 @@ import dev.sinan.launcher.ui.dp
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** 用户开启的可见入口；不使用定时保活、闹钟、开机接收器或粘性重启。 */
+/** 用户开启的可见入口；允许系统粘性恢复，不使用定时保活或闹钟。 */
 class FloatingBallService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val controller get() = (application as SinanApplication).ball
@@ -77,7 +77,11 @@ class FloatingBallService : Service() {
     private val observer: () -> Unit = { reconcile() }
     private val appOpsListener = AppOpsManager.OnOpChangedListener { _, _ -> main.post { reconcile() } }
     private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) { reconcile() }
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == NotificationManager.ACTION_APP_BLOCK_STATE_CHANGED ||
+                intent.action == NotificationManager.ACTION_NOTIFICATION_CHANNEL_BLOCK_STATE_CHANGED) refreshNotification()
+            reconcile()
+        }
     }
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = Unit
@@ -90,11 +94,12 @@ class FloatingBallService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP || !controller.isEnabled || !Settings.canDrawOverlays(this) || !notificationsAvailable(this)) {
+        if (intent?.action == ACTION_STOP || !Settings.canDrawOverlays(this)) {
+            controller.disable()
             stopSelf()
             return START_NOT_STICKY
         }
-        if (started) { reconcile(); return START_NOT_STICKY }
+        if (started) { refreshNotification(); reconcile(); return START_STICKY }
         try {
             val notification = notification()
             if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -122,9 +127,16 @@ class FloatingBallService : Service() {
             reconcile()
         } catch (_: RuntimeException) {
             Toast.makeText(this, R.string.ball_failed, Toast.LENGTH_LONG).show()
+            controller.disable()
             stopSelf()
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    private fun refreshNotification() {
+        if (started && notificationsAvailable(this)) {
+            runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification()) }
+        }
     }
 
     private fun notification(): Notification {
@@ -142,6 +154,9 @@ class FloatingBallService : Service() {
             .addAction(Notification.Action.Builder(null, getString(R.string.settings), activity(2, true)).build())
             .addAction(Notification.Action.Builder(null, getString(R.string.ball_disable), stop).build())
             .setCategory(Notification.CATEGORY_SERVICE).setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
+            .apply {
+                if (Build.VERSION.SDK_INT >= 31) setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+            }
             .build()
     }
 
@@ -272,7 +287,13 @@ class FloatingBallService : Service() {
 
     private fun reconcile() {
         if (!started) return
-        if (!controller.isEnabled || !Settings.canDrawOverlays(this) || !notificationsAvailable(this)) { stopSelf(); return }
+        if (!controller.isReady) return
+        if (!Settings.canDrawOverlays(this)) {
+            if (controller.isEnabled) controller.disable()
+            stopSelf()
+            return
+        }
+        if (!controller.isEnabled) { stopSelf(); return }
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
         val interactive = getSystemService(PowerManager::class.java).isInteractive
         val show = appearance.isReady && !controller.isPanelVisible && !locked && interactive
