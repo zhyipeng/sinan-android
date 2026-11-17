@@ -13,6 +13,7 @@ PACKAGE = 'dev.sinan.launcher'
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
+    parser.add_argument('--keyboard', action='store_true', help='仅验证键盘缩放、保存、横屏大字号和后台设置按钮')
     args = parser.parse_args()
     adb = ['adb', '-s', args.serial]
 
@@ -120,6 +121,72 @@ def main():
         sh('wm', 'fixed-to-user-rotation', 'enabled')
         sh('settings', 'put', 'system', 'accelerometer_rotation', '0')
         sh('settings', 'put', 'system', 'user_rotation', '0')
+        if args.keyboard:
+            density = int(re.search(r'(\d+)', sh('wm', 'density')).group(1)) / 160
+
+            def key_bounds():
+                tree = nodes()
+                keys = [n for n in tree if n.get('package') == PACKAGE and
+                        n.get('content-desc', '').startswith('数字 ')]
+                assert len(keys) == 10, '数字键不完整'
+                grids = [n for n in tree if n.get('package') == PACKAGE and n.get('class') == 'android.widget.GridView']
+                assert any(list(g) for g in grids), '缩放后应用结果网格不可见'
+                for key in keys:
+                    a, b, c, d = bounds(key)
+                    assert c - a >= 48 * density - 2 and d - b >= 48 * density - 2, '按键触摸区小于48dp'
+                return bounds(next(n for n in keys if n.get('content-desc').startswith('数字 2，')))
+
+            def return_search():
+                sh('input', 'keyevent', 'KEYCODE_BACK')
+                time.sleep(0.3)
+                return key_bounds()
+
+            start()
+            original = return_search()
+            tap(find('设置'))
+            set_slider('键盘大小', 0)
+            small = return_search()
+            assert small[3] - small[1] < original[3] - original[1], '80%键盘高度未缩小'
+            tap(find('设置'))
+            set_slider('键盘大小', 1)
+            large = return_search()
+            assert large[3] - large[1] > original[3] - original[1], '130%键盘高度未增大'
+            tap(find('数字 2，ABC'))
+            assert any(n.get('content-desc') == '搜索数字：2' for n in nodes()), '缩放后输入失败'
+            tap(find('设置'))
+            set_slider('面板高度', 0)
+            return_search()
+            shot('keyboard-portrait-130-small-panel')
+            start()
+            assert prefs('shared_prefs/layout-preferences.xml')['keyboard-size'] == '130'
+            button = find('悬浮球后台运行设置')
+            shot('background-button')
+            tap(button)
+            assert any(n.get('text') in ['应用详情与自启动'] for n in nodes()), '后台设置弹窗未打开'
+            sh('input', 'keyevent', 'KEYCODE_BACK')
+            sh('settings', 'put', 'system', 'font_scale', '1.5')
+            sh('settings', 'put', 'system', 'user_rotation', '1')
+            start()
+            a, b, c, d = frame()
+            assert c - a > d - b, '未实际横屏'
+            expanded = return_search()
+            shot('keyboard-landscape-font150-130')
+            tap(find('设置'))
+            set_slider('键盘大小', 0)
+            reduced = return_search()
+            assert reduced[2] - reduced[0] < expanded[2] - expanded[0], '横屏键盘宽度未缩小'
+            shot('keyboard-landscape-font150-80')
+            sh('am', 'force-stop', PACKAGE)
+            sh('appops', 'set', PACKAGE, 'SYSTEM_ALERT_WINDOW', 'deny')
+            sh('am', 'start', '-W', '-n', PACKAGE + '/.MainActivity')
+            tap(find('设置'))
+            tap(find('布局与大小'))
+            set_slider('键盘大小', 1)
+            tap(next(n for n in nodes() if n.get('resource-id') == 'android:id/button1'))
+            key_bounds()
+            assert prefs('shared_prefs/layout-preferences.xml')['keyboard-size'] == '130'
+            print('PASS 键盘80%/130%、最小48dp触摸、输入、保存、小面板、实际横屏150%字号、降级入口及后台按钮', flush=True)
+            return
         start()
         default_frame = frame()
         set_slider('面板宽度', 0)
@@ -132,7 +199,7 @@ def main():
         set_slider('应用图标大小', 1)
         set_slider('网格列数', 1)
         saved = prefs('shared_prefs/layout-preferences.xml')
-        assert saved == {'panel-width': '70', 'panel-height': '75', 'panel-opacity': '20', 'icon-size': '72', 'columns': '6'}, saved
+        assert saved == {'panel-width': '70', 'panel-height': '75', 'panel-opacity': '20', 'icon-size': '72', 'columns': '6', 'keyboard-size': '100'}, saved
         assert prefs('shared_prefs/floating-ball-appearance.xml')['size'] == '80'
         shot('settings-small')
         start()

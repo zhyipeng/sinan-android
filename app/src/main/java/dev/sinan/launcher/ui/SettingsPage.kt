@@ -175,7 +175,18 @@ class SettingsPage(activity: Activity, onBack: () -> Unit, actions: SettingsActi
         })
         column.addView(Button(activity).apply {
             setText(R.string.ball_background)
-            setOnClickListener { actions.showBallBackgroundSettings() }
+            activity.styleActionButton(
+                button = this,
+                fillColorRes = R.color.surface_elevated,
+                textColorRes = R.color.brand_accent,
+                strokeColorRes = R.color.divider_subtle,
+                radiusDp = 12,
+            )
+            attachPressScale()
+            setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                actions.showBallBackgroundSettings()
+            }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             topMargin = activity.dp(14)
         })

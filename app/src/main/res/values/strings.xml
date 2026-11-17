@@ -72,4 +72,6 @@
   <string name="ball_vendor_instructions">如悬浮球被系统清理，可在应用详情中允许后台运行，并将电池策略设为不限制。小米 / HyperOS 等设备还需在系统设置中允许司南自启动，具体入口因系统版本而异。
 
 仅已开启的悬浮球会在开机后尝试恢复。划掉最近任务不会主动关闭；强行停止、系统限制或厂商清理仍可能阻止恢复。关闭悬浮球后不再自动恢复。</string>
+  <string name="keyboard_size">键盘大小</string>
+  <string name="keyboard_size_description">键盘默认 100%，竖屏调整按键高度，横屏同时调整键盘宽度；文字和图标同步缩放，实际大小受可用空间限制。</string>
 </resources>

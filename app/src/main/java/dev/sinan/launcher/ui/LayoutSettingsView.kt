@@ -40,6 +40,13 @@ class LayoutSettingsView(context: Context) : LinearLayout(context) {
             { if (it == 1) context.getString(R.string.grid_columns_auto) else context.getString(R.string.grid_columns_value, it) }) {
             store.update(store.current.copy(columns = if (it == 1) 0 else it))
         }
+        slider(R.string.keyboard_size, 80, 130, { store.current.keyboardSize }, { store.isReady },
+            { context.getString(R.string.layout_percent, it) }) { store.update(store.current.copy(keyboardSize = it)) }
+        addView(TextView(context).apply {
+            setText(R.string.keyboard_size_description)
+            textSize = 12f
+            setTextColor(context.getColor(R.color.text_secondary))
+        })
         observer()
     }
 

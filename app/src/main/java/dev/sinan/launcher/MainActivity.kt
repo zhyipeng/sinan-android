@@ -31,6 +31,7 @@ import dev.sinan.launcher.ui.styleActionButton
 /** 无悬浮权限时直接使用网格；已有权限时桌面入口默认打开面板。 */
 class MainActivity : Activity() {
     private lateinit var root: LinearLayout
+    private lateinit var topArea: LinearLayout
     private lateinit var header: LinearLayout
     private lateinit var permission: Button
     private lateinit var statusDot: View
@@ -50,6 +51,9 @@ class MainActivity : Activity() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+
+        topArea = LinearLayout(this)
+        root.addView(topArea, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
         // 顶部品牌栏
         header = LinearLayout(this).apply {
@@ -87,7 +91,7 @@ class MainActivity : Activity() {
             }
         }
         header.addView(usageButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        root.addView(header)
+        topArea.addView(header)
 
         // 权限状态引导卡片
         bannerCard = LinearLayout(this).apply {
@@ -127,7 +131,7 @@ class MainActivity : Activity() {
             }
         }
         bannerCard.addView(permission)
-        root.addView(bannerCard)
+        topArea.addView(bannerCard)
 
         grid = AppGridView(this, onSettings = { showSettingsMenu() }, onLaunched = { finish() })
         root.addView(grid, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -155,12 +159,23 @@ class MainActivity : Activity() {
 
     private fun applyOrientationLayout(landscape: Boolean) {
         applyRootPadding(landscape)
-        header.setPadding(0, 0, 0, dp(if (landscape) 8 else 12))
+        // 横屏将品牌/使用记录与权限入口放在一行，给九宫格保留最小触摸区。
+        topArea.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        topArea.gravity = Gravity.CENTER_VERTICAL
+        header.layoutParams = if (landscape) {
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        } else LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        header.setPadding(0, 0, 0, dp(if (landscape) 0 else 12))
+        statusRow.visibility = if (landscape) View.GONE else View.VISIBLE
         bannerCard.apply {
             orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
             gravity = if (landscape) Gravity.CENTER_VERTICAL else Gravity.NO_GRAVITY
             setPadding(dp(14), dp(if (landscape) 8 else 12), dp(14), dp(if (landscape) 8 else 12))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                if (landscape) LinearLayout.LayoutParams.WRAP_CONTENT else LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = dp(if (landscape) 12 else 0)
                 bottomMargin = dp(if (landscape) 6 else 8)
             }
         }

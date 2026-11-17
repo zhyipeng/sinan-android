@@ -37,6 +37,7 @@ class AppGridView @JvmOverloads constructor(
         updateColumns(grid.width)
         adapter.notifyDataSetChanged()
         grid.requestLayout()
+        requestLayout()
     }
     private val repository = (context.applicationContext as SinanApplication).apps
     private val emptyState = LinearLayout(context)
@@ -72,6 +73,7 @@ class AppGridView @JvmOverloads constructor(
     private var query = ""
     private var compact = false
     private var layoutWidth = 0
+    private var keyboardSize = 0
     private val verticalResults = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
     private val horizontalResults = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
     private val verticalKeys = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
@@ -137,8 +139,15 @@ class AppGridView @JvmOverloads constructor(
         grid.apply {
             numColumns = 4
             addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
-                updateColumns(right - left)
-                if (right - left != oldRight - oldLeft) this@AppGridView.adapter.notifyDataSetChanged()
+                if (right - left != oldRight - oldLeft) {
+                    // GridView 布局中同步刷新可能清空已挂载单元，等本轮布局完成后再绑定。
+                    post {
+                        if (isAttachedToWindow) {
+                            updateColumns(width)
+                            this@AppGridView.adapter.notifyDataSetChanged()
+                        }
+                    }
+                }
             }
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             horizontalSpacing = dp(4)
@@ -241,11 +250,16 @@ class AppGridView @JvmOverloads constructor(
         val h = MeasureSpec.getSize(heightMeasureSpec)
         val horizontal = h > 0 && w > h
         // 在测量前切换布局，不能在 onSizeChanged 中让本次布局沿用旧方向的测量结果。
-        if (compact != horizontal || layoutWidth != w) {
+        val scale = layoutStore.current.keyboardSize
+        keyboard.setSizePercent(scale)
+        keyboard.availableHeight = if (horizontal) Int.MAX_VALUE else maxOf(dp(48) * 4 + dp(24), h - dp(160))
+        if (compact != horizontal || layoutWidth != w || keyboardSize != scale) {
+            keyboardSize = scale
             compact = horizontal
             layoutWidth = w
             orientation = if (horizontal) HORIZONTAL else VERTICAL
-            horizontalKeys.width = minOf((w * 0.44f).toInt(), dp(256))
+            horizontalKeys.width = (minOf((w * 0.44f).toInt(), dp(256)) * scale / 100)
+                .coerceIn(minOf(dp(160), w / 2), maxOf(minOf(dp(160), w / 2), w - dp(124)))
             resultsColumn.layoutParams = if (horizontal) horizontalResults else verticalResults
             keyboardColumn.layoutParams = if (horizontal) horizontalKeys else verticalKeys
             queryBar.minimumHeight = dp(if (horizontal) 38 else 44)

@@ -29,16 +29,30 @@ class T9KeyboardView @JvmOverloads constructor(
         val letters: TextView?,
     )
 
+    private val textMeasurePaint = android.graphics.Paint()
+    private val functionKeys = mutableListOf<ImageButton>()
     private val delete = ImageButton(context)
     private val rows = mutableListOf<LinearLayout>()
     private val digitKeys = mutableListOf<KeyHolder>()
     private var rowHeight = context.dp(54)
     private var verticalMinHeight = context.dp(50)
+    private var digitContentHeight = context.dp(24)
     private var fillMode = false
     private var stackedKeys = true
+    private var sizePercent = 100
+    var availableHeight = Int.MAX_VALUE
+
+    fun setSizePercent(value: Int) {
+        val bounded = value.coerceIn(80, 130)
+        if (bounded == sizePercent) return
+        sizePercent = bounded
+        computeHeights()
+        requestLayout()
+    }
 
     init {
         orientation = VERTICAL
+        gravity = Gravity.BOTTOM
         val labels = listOf("", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ")
         val keys: List<View> = (1..9).map { number ->
             createDigitKey(number.toString(), labels[number - 1]) {
@@ -88,21 +102,22 @@ class T9KeyboardView @JvmOverloads constructor(
 
     private fun computeHeights() {
         val digitSample = TextView(context).apply {
-            textSize = 21f
+            textSize = 21f * sizePercent / 100
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
         }
         val letterSample = TextView(context).apply {
-            textSize = 10f
+            textSize = 10f * sizePercent / 100
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
         }
+        digitContentHeight = ceil(digitSample.paint.fontMetrics.let { (it.descent - it.ascent).toDouble() }).toInt()
         val contentHeight = ceil(
             (digitSample.paint.fontMetrics.let { it.descent - it.ascent } +
                 letterSample.paint.fontMetrics.let { it.descent - it.ascent }).toDouble(),
         ).toInt()
         verticalMinHeight = contentHeight + context.dp(10)
-        rowHeight = maxOf(context.dp(54), contentHeight + context.dp(18))
+        rowHeight = maxOf(context.dp(48), context.dp(54) * sizePercent / 100, contentHeight + context.dp(18))
     }
 
     private fun createDigitKey(digit: String, letters: String, onClick: () -> Unit): View {
@@ -170,9 +185,10 @@ class T9KeyboardView @JvmOverloads constructor(
         onClick: () -> Unit,
         onLongClick: (() -> Unit)? = null,
     ): ImageButton {
+        functionKeys.add(button)
         return button.apply {
             setImageResource(iconRes)
-            scaleType = ImageView.ScaleType.CENTER
+            scaleType = ImageView.ScaleType.FIT_CENTER
             imageTintList = ColorStateList.valueOf(context.getColor(R.color.text_primary))
             contentDescription = description
             background = context.rippleSurface(
@@ -202,26 +218,62 @@ class T9KeyboardView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val h = MeasureSpec.getSize(heightMeasureSpec)
-        val perRow = if (fillMode && h > 0) (h - context.dp(6) * 3) / 4 else rowHeight
-        val shouldStack = !fillMode || h == 0 || perRow >= verticalMinHeight
-        if (stackedKeys != shouldStack) {
-            stackedKeys = shouldStack
-            applyKeyLayout(shouldStack)
+        val gap = context.dp(if (fillMode) 6 else 8)
+        val limit = minOf(availableHeight, if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) Int.MAX_VALUE else h)
+        val defaultRow = if (fillMode && h > 0) maxOf(0, (h - gap * 3) / 4) else rowHeight
+        val requestedRow = if (fillMode) defaultRow * sizePercent / 100 else rowHeight
+        val perRow = minOf(maxOf(context.dp(48), requestedRow), maxOf(0, (limit - gap * 3) / 4))
+        stackedKeys = perRow >= verticalMinHeight
+        // 狭窄/矮屏先改为数字字母并排，再限制字体，避免放大后裁切。
+        val fontFit = minOf(1f, (perRow - context.dp(8)).coerceAtLeast(1).toFloat() /
+            if (stackedKeys) maxOf(1, verticalMinHeight - context.dp(10)).toFloat() else
+                maxOf(1, digitContentHeight).toFloat())
+        applyKeyLayout(stackedKeys, fontFit, ((MeasureSpec.getSize(widthMeasureSpec) - context.dp(16)) / 3 - context.dp(8)).coerceAtLeast(1))
+        rows.forEachIndexed { index, row ->
+            val params = row.layoutParams as LayoutParams
+            val margin = if (index < rows.lastIndex) gap else 0
+            if (params.height != perRow || params.weight != 0f || params.bottomMargin != margin) {
+                params.height = perRow
+                params.weight = 0f
+                params.bottomMargin = margin
+                row.layoutParams = params
+            }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        functionKeys.forEach { key ->
+            val icon = minOf(context.dp(24) * sizePercent / 100, (minOf(key.measuredWidth, key.measuredHeight) - context.dp(12)).coerceAtLeast(1))
+            val horizontal = (key.measuredWidth - icon) / 2
+            val vertical = (key.measuredHeight - icon) / 2
+            if (key.paddingLeft != horizontal || key.paddingTop != vertical) key.setPadding(horizontal, vertical, horizontal, vertical)
+        }
     }
 
-    private fun applyKeyLayout(stacked: Boolean) {
+    private fun applyKeyLayout(stacked: Boolean, fontFit: Float, contentWidth: Int) {
+        val scale = sizePercent / 100f * fontFit
         digitKeys.forEach { holder ->
+            val digitSize = (if (stacked) 21f else 17f) * scale
+            val letterSize = (if (stacked) 10f else 9.5f) * scale
+            textMeasurePaint.set(holder.digit.paint)
+            textMeasurePaint.textSize = android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_SP, digitSize, resources.displayMetrics,
+            )
+            val digitWidth = textMeasurePaint.measureText(holder.digit.text.toString())
+            val letterWidth = holder.letters?.let {
+                textMeasurePaint.set(it.paint)
+                textMeasurePaint.textSize = android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_SP, letterSize, resources.displayMetrics,
+                )
+                textMeasurePaint.measureText(it.text.toString()) + textMeasurePaint.textSize * 0.4f
+            } ?: 0f
+            val desiredWidth = if (stacked) maxOf(digitWidth, letterWidth) else digitWidth + letterWidth + context.dp(4)
+            val widthFit = minOf(1f, contentWidth / maxOf(1f, desiredWidth))
             holder.container.orientation = if (stacked) VERTICAL else HORIZONTAL
-            holder.digit.textSize = if (stacked) 21f else 17f
+            holder.digit.textSize = digitSize * widthFit
             holder.letters?.apply {
-                textSize = if (stacked) 10f else 9.5f
+                textSize = letterSize * widthFit
                 setPadding(
                     if (stacked) 0 else context.dp(4),
-                    if (stacked) context.dp(2) else context.dp(1),
-                    0,
-                    0,
+                    if (stacked) context.dp(2) else context.dp(1), 0, 0,
                 )
             }
         }

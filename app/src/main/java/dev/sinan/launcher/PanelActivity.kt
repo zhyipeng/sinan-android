@@ -258,7 +258,7 @@ class PanelActivity : Activity() {
             .coerceIn(minOf(dp(320), bounds.width()), bounds.width())
         val maxHeight = (bounds.height() * 0.95f).toInt()
         val height = (bounds.height() * (if (landscape) 0.90f else 0.79f) * value.panelHeight / 100).toInt()
-            .coerceIn(minOf(dp(if (landscape) 270 else 520), maxHeight), maxHeight)
+            .coerceIn(minOf(dp(if (landscape) 320 else 520), maxHeight), maxHeight)
         panel?.window?.let { if (it.attributes.width != width || it.attributes.height != height) it.setLayout(width, height) }
     }
 }
