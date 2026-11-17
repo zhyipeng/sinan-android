@@ -32,6 +32,12 @@ class AppGridView @JvmOverloads constructor(
     onSettings: () -> Unit = {},
     private val onLaunched: () -> Unit = {},
 ) : LinearLayout(context) {
+    private val layoutStore = (context.applicationContext as SinanApplication).layoutPreferences
+    private val layoutObserver: () -> Unit = {
+        updateColumns(grid.width)
+        adapter.notifyDataSetChanged()
+        grid.requestLayout()
+    }
     private val repository = (context.applicationContext as SinanApplication).apps
     private val emptyState = LinearLayout(context)
     private val status = TextView(context)
@@ -130,9 +136,9 @@ class AppGridView @JvmOverloads constructor(
         // 应用网格
         grid.apply {
             numColumns = 4
-            addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
-                val count = ((right - left) / dp(84)).coerceIn(2, 6)
-                if (numColumns != count) numColumns = count
+            addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+                updateColumns(right - left)
+                if (right - left != oldRight - oldLeft) this@AppGridView.adapter.notifyDataSetChanged()
             }
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             horizontalSpacing = dp(4)
@@ -259,10 +265,13 @@ class AppGridView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        layoutStore.observe(layoutObserver)
+        layoutObserver()
         refresh()
     }
 
     override fun onDetachedFromWindow() {
+        layoutStore.removeObserver(layoutObserver)
         generation++
         searchRevision++
         load?.cancel(true)
@@ -330,6 +339,16 @@ class AppGridView @JvmOverloads constructor(
         }
     }
 
+    private fun updateColumns(width: Int) {
+        if (width <= 0) return
+        val value = layoutStore.current
+        val maxColumns = ((width + dp(4)) / dp(60)).coerceIn(1, 6)
+        val count = if (value.columns == 0) (width / dp(maxOf(84, value.iconSize + 24))).coerceIn(2, 6)
+            else value.columns
+        val fitted = minOf(count, maxColumns)
+        if (grid.numColumns != fitted) grid.numColumns = fitted
+    }
+
     private inner class AppAdapter : BaseAdapter() {
         override fun getCount() = apps.size
         override fun getItem(position: Int) = apps[position]
@@ -361,6 +380,11 @@ class AppGridView @JvmOverloads constructor(
             }
             val app = getItem(position)
             val icon = cell.getChildAt(0) as ImageView
+            val available = ((grid.width - grid.paddingLeft - grid.paddingRight - dp(4) * (grid.numColumns - 1)) /
+                grid.numColumns - dp(8)).coerceAtLeast(dp(24))
+            val iconPixels = minOf(dp(layoutStore.current.iconSize), available)
+            icon.layoutParams = LayoutParams(iconPixels, iconPixels)
+            cell.minimumHeight = maxOf(dp(96), iconPixels + dp(48))
             (cell.getChildAt(1) as TextView).text = app.entry.label
             cell.contentDescription = app.entry.label
             icon.tag = app.entry.id

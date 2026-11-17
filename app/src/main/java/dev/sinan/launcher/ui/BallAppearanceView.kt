@@ -198,6 +198,10 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
             preview.setImageDrawable(BallStyleDrawable(context, appearance.style))
         }
         preview.alpha = appearance.opacity / 100f
+        preview.layoutParams = (preview.layoutParams as FrameLayout.LayoutParams).apply {
+            width = context.dp(appearance.size)
+            height = context.dp(appearance.size)
+        }
         value.text = context.getString(
             R.string.ball_appearance_value,
             context.getString(appearance.style.label),

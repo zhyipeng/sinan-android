@@ -6,6 +6,7 @@ import dev.sinan.launcher.apps.AppRepository
 import dev.sinan.launcher.ball.BallAppearanceStore
 import dev.sinan.launcher.ball.BallPositionStore
 import dev.sinan.launcher.ball.FloatingBallController
+import dev.sinan.launcher.ui.LayoutPreferencesStore
 
 class SinanApplication : Application() {
     private val repository = lazy { AppRepository(this) }
@@ -13,6 +14,8 @@ class SinanApplication : Application() {
     val ball by lazy { FloatingBallController(this) }
     val ballPositions by lazy { BallPositionStore(this) }
     val ballAppearance by lazy { BallAppearanceStore(this) }
+
+    val layoutPreferences by lazy { LayoutPreferencesStore(this) }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)

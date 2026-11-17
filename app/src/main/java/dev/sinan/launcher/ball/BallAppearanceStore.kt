@@ -11,7 +11,7 @@ enum class BallStyle(val label: Int) {
     POLARIS(R.string.ball_style_polaris), JADE(R.string.ball_style_jade), SEAL(R.string.ball_style_seal),
 }
 
-data class BallAppearance(val style: BallStyle = BallStyle.CLASSIC, val opacity: Int = 100)
+data class BallAppearance(val style: BallStyle = BallStyle.CLASSIC, val opacity: Int = 100, val size: Int = 48)
 
 /** 主线程发布即时外观，后台串行持久化；滑动期间合并写入，不保存开启状态。 */
 class BallAppearanceStore(context: Context) {
@@ -30,7 +30,7 @@ class BallAppearanceStore(context: Context) {
         worker.execute {
             val loaded = runCatching {
                 val style = BallStyle.entries.firstOrNull { it.name == prefs.getString("style", "CLASSIC") } ?: BallStyle.CLASSIC
-                BallAppearance(style, prefs.getInt("opacity", 100).coerceIn(20, 100))
+                BallAppearance(style, prefs.getInt("opacity", 100).coerceIn(20, 100), prefs.getInt("size", 48).coerceIn(32, 80))
             }.getOrDefault(BallAppearance())
             main.post { current = loaded; isReady = true; changed() }
         }
@@ -38,6 +38,8 @@ class BallAppearanceStore(context: Context) {
 
     fun select(style: BallStyle) { update(current.copy(style = style)); flush() }
     fun opacity(value: Int) = update(current.copy(opacity = value.coerceIn(20, 100)))
+
+    fun size(value: Int) = update(current.copy(size = value.coerceIn(32, 80)))
 
     private fun update(value: BallAppearance) {
         if (!isReady || value == current) return
@@ -53,7 +55,7 @@ class BallAppearanceStore(context: Context) {
         if (!dirty) return
         dirty = false
         val snapshot = current
-        worker.execute { prefs.edit().putString("style", snapshot.style.name).putInt("opacity", snapshot.opacity).apply() }
+        worker.execute { prefs.edit().putString("style", snapshot.style.name).putInt("opacity", snapshot.opacity).putInt("size", snapshot.size).apply() }
     }
 
     fun observe(listener: () -> Unit) { listeners.add(listener) }

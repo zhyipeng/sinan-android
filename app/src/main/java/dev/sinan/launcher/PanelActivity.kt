@@ -25,6 +25,15 @@ import dev.sinan.launcher.ui.roundedShape
 /** 透明前台宿主管理短生命周期的真实悬浮窗口，不启动常驻服务。 */
 class PanelActivity : Activity() {
     private var panel: Dialog? = null
+    private val layoutStore get() = (application as SinanApplication).layoutPreferences
+    private val layoutObserver: () -> Unit = { applyLayoutPreferences() }
+
+    private fun applyLayoutPreferences() {
+        panel?.window?.setBackgroundDrawable(getDrawable(R.drawable.panel_background)?.mutate()?.apply {
+            alpha = layoutStore.current.panelOpacity * 255 / 100
+        })
+        if (panel?.isShowing == true) resizePanel()
+    }
     private lateinit var grid: AppGridView
     private lateinit var settingsPage: SettingsPage
     private lateinit var settingsActions: SettingsActions
@@ -109,6 +118,8 @@ class PanelActivity : Activity() {
             setDimAmount(0.32f)
         }
         panel = dialog
+        layoutStore.observe(layoutObserver)
+        applyLayoutPreferences()
         root.requestApplyInsets()
     }
 
@@ -156,6 +167,8 @@ class PanelActivity : Activity() {
     }
 
     override fun onDestroy() {
+        layoutStore.removeObserver(layoutObserver)
+        layoutStore.flush()
         if (::settingsActions.isInitialized) settingsActions.dismissDialogs()
         (application as SinanApplication).ball.panelHidden(this)
         stopWatchingDisplay()
@@ -231,8 +244,12 @@ class PanelActivity : Activity() {
             android.graphics.Rect(0, 0, metrics.widthPixels, metrics.heightPixels)
         }
         val landscape = bounds.width() > bounds.height()
-        val width = minOf(bounds.width(), dp(560))
-        val height = (bounds.height() * if (landscape) 0.90f else 0.79f).toInt()
+        val value = layoutStore.current
+        val width = (minOf(bounds.width(), dp(560)) * value.panelWidth / 100)
+            .coerceIn(minOf(dp(320), bounds.width()), bounds.width())
+        val maxHeight = (bounds.height() * 0.95f).toInt()
+        val height = (bounds.height() * (if (landscape) 0.90f else 0.79f) * value.panelHeight / 100).toInt()
+            .coerceIn(minOf(dp(if (landscape) 270 else 520), maxHeight), maxHeight)
         panel?.window?.let { if (it.attributes.width != width || it.attributes.height != height) it.setLayout(width, height) }
     }
 }

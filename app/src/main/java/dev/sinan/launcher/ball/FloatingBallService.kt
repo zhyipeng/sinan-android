@@ -173,7 +173,19 @@ class FloatingBallService : Service() {
             ball?.setImageDrawable(BallStyleDrawable(this, value.style))
         }
         params.alpha = value.opacity / 100f
-        update()
+        val touchSize = dp(maxOf(48, value.size))
+        val padding = (touchSize - dp(value.size)) / 2
+        ball?.setPadding(padding, padding, padding, padding)
+        if (params.width != touchSize || params.height != touchSize) {
+            // 首次外观加载可能早于位置读取；无触摸时不能作废待返回的贴边位置。
+            if (dragging || ball?.isPressed == true) positionRevision++
+            ball?.isPressed = false
+            dragging = false
+            canceled = true
+            params.width = touchSize
+            params.height = touchSize
+            place()
+        } else update()
     }
 
     /** 返回是否形成点击；消费触摸与无障碍 performClick 在监听器中统一处理。 */

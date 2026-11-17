@@ -12,7 +12,7 @@ import dev.sinan.launcher.R
 import dev.sinan.launcher.ui.dp
 import kotlin.math.min
 
-/** 同一套原生矢量绘制用于真实窗口和设置预览；48dp 触摸区域不随样式改变。 */
+/** 同一套原生矢量绘制用于真实窗口和设置预览；触摸区域由服务按设置大小维护。 */
 class BallStyleDrawable(context: Context, private val style: BallStyle) : Drawable() {
     private val size = context.dp(48)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)

@@ -233,12 +233,14 @@ class MainActivity : Activity() {
                     getString(if (Settings.canDrawOverlays(this)) R.string.open_panel else R.string.allow_overlay),
                     getString(R.string.usage_records),
                     getString(if (ball.isEnabled) R.string.ball_disable else R.string.ball_enable),
+                    getString(R.string.layout_settings),
                 ),
             ) { _, index ->
                 when (index) {
                     0 -> if (Settings.canDrawOverlays(this)) openPanel() else requestOverlay()
                     1 -> settingsActions.showUsageRecords()
                     2 -> if (ball.isEnabled) ball.disable() else settingsActions.explainBall()
+                    3 -> settingsActions.showLayoutSettings()
                 }
             }.show()
     }

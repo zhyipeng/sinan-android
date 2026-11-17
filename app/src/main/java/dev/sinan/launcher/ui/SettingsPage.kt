@@ -170,6 +170,9 @@ class SettingsPage(activity: Activity, onBack: () -> Unit, actions: SettingsActi
             bottomMargin = activity.dp(14)
         })
         column.addView(BallAppearanceView(activity))
+        column.addView(LayoutSettingsView(activity), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = activity.dp(14)
+        })
         addView(column)
         refresh()
     }

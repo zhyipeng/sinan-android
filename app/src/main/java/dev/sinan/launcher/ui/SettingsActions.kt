@@ -132,5 +132,13 @@ class SettingsActions(
             }.showOwned(destructive = true)
     }
 
+    fun showLayoutSettings() {
+        val content = android.widget.ScrollView(activity).apply {
+            addView(LayoutSettingsView(activity))
+        }
+        dialogBuilder().setTitle(R.string.layout_settings).setView(content)
+            .setPositiveButton(android.R.string.ok, null).showOwned()
+    }
+
     companion object { private const val BALL_NOTIFICATION_REQUEST = 210 }
 }
