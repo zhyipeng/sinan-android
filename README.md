@@ -66,6 +66,13 @@ gradle/               版本目录和 Gradle Wrapper
 ./gradlew :app:installDebug
 ```
 
+正式包用打包脚本一步产出（Gradle 构建 → zipalign → apksigner 签名 → 校验 → 输出 `dist/sinan-<版本>-release.apk`）。默认使用本机 debug keystore 签名，可直接安装但不可上架；传入 `--keystore`、`--ks-alias`、`--ks-pass-file` 可改用正式 keystore：
+
+```bash
+./tools/package_release.sh
+./tools/package_release.sh --keystore /path/release.jks --ks-alias <别名> --ks-pass-file /path/ks-pass.txt
+```
+
 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。安装命令需要连接已授权的设备或模拟器。搜索模块可通过 `./gradlew :core:search:test` 运行固定样例和边界测试；构建成功不等于完成 Android 搜索交互和性能验收。
 
 AGP 与 Kotlin 的兼容依据见 [Android 官方说明](https://developer.android.com/build/releases/agp-8-13-0-release-notes)和 [Kotlin 官方兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)。AGP 8.13.2 补充 Kotlin 2.3 的 R8 支持；具体工具链以实际构建结果为准，不自动追随最新版本。

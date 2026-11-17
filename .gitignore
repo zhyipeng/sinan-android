@@ -7,6 +7,7 @@ captures/
 .externalNativeBuild/
 *.apk
 *.aab
+dist/
 
 # 本机配置与编辑器状态
 local.properties
