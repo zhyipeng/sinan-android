@@ -259,6 +259,7 @@ class MainActivity : Activity() {
                     getString(if (ball.isEnabled) R.string.ball_disable else R.string.ball_enable),
                     getString(R.string.layout_settings),
                     getString(R.string.ball_background),
+                    getString(R.string.appearance_images),
                 ),
             ) { _, index ->
                 when (index) {
@@ -267,6 +268,7 @@ class MainActivity : Activity() {
                     2 -> if (ball.isEnabled) ball.disable() else settingsActions.explainBall()
                     3 -> settingsActions.showLayoutSettings()
                     4 -> settingsActions.showBallBackgroundSettings()
+                    5 -> settingsActions.showCustomAppearance()
                 }
             }.show()
     }
@@ -274,6 +276,12 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         settingsActions.onPermissionResult(requestCode, grantResults)
+    }
+
+    @Deprecated("Activity result callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        settingsActions.onAppearanceImageResult(requestCode, resultCode, data)
     }
 
     override fun onDestroy() {

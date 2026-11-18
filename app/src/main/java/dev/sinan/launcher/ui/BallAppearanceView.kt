@@ -1,6 +1,8 @@
 package dev.sinan.launcher.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -22,17 +24,23 @@ import android.widget.Space
 import android.widget.TextView
 import dev.sinan.launcher.R
 import dev.sinan.launcher.SinanApplication
+import dev.sinan.launcher.appearance.AppearanceImage
+import dev.sinan.launcher.appearance.AppearanceImageDrawable
 import dev.sinan.launcher.ball.BallStyle
 import dev.sinan.launcher.ball.BallStyleDrawable
 
 /** 设置中的实物尺寸预览，样式和透明度使用与悬浮窗口相同的绘制与配置。 */
-class BallAppearanceView(context: Context) : LinearLayout(context) {
-    private val store = (context.applicationContext as SinanApplication).ballAppearance
+@SuppressLint("ViewConstructor") // 仅由原生设置页创建，需要共享设置操作。
+class BallAppearanceView(context: Context, actions: SettingsActions) : LinearLayout(context) {
+    private val app = context.applicationContext as SinanApplication
+    private val store = app.ballAppearance
+    private val images = app.appearanceImages
     private val preview = ImageView(context)
     private val value = TextView(context)
     private val slider = SeekBar(context)
     private val choices = linkedMapOf<BallStyle, RadioButton>()
     private var previewStyle: BallStyle? = null
+    private var previewImage: Bitmap? = null
     private val observer: () -> Unit = { render() }
 
     init {
@@ -151,7 +159,10 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
                     setPadding(context.dp(4), context.dp(12), context.dp(4), context.dp(12))
                     background = selectionBackground()
                     attachPressScale(0.96f)
-                    setOnClickListener { store.select(style) }
+                    setOnClickListener {
+                        if (images[AppearanceImage.BALL] == null) store.select(style)
+                        else actions.clearAppearanceImage(AppearanceImage.BALL) { store.select(style) }
+                    }
                 }
                 choices[style] = choice
                 row.addView(choice, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -168,6 +179,7 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
                 if (rowIndex < rows.lastIndex) bottomMargin = gap
             })
         }
+        addView(AppearanceImageControls(context, AppearanceImage.BALL, actions))
         render()
     }
 
@@ -193,9 +205,14 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
 
     private fun render() {
         val appearance = store.current
-        if (previewStyle != appearance.style) {
+        val image = images[AppearanceImage.BALL]
+        if (previewStyle != appearance.style || previewImage !== image) {
             previewStyle = appearance.style
-            preview.setImageDrawable(BallStyleDrawable(context, appearance.style))
+            previewImage = image
+            preview.setImageDrawable(
+                if (image == null) BallStyleDrawable(context, appearance.style)
+                else AppearanceImageDrawable(context, image, AppearanceImage.BALL),
+            )
         }
         preview.alpha = appearance.opacity / 100f
         preview.layoutParams = (preview.layoutParams as FrameLayout.LayoutParams).apply {
@@ -204,16 +221,16 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
         }
         value.text = context.getString(
             R.string.ball_appearance_value,
-            context.getString(appearance.style.label),
+            context.getString(if (image == null) appearance.style.label else R.string.ball_style_custom),
             appearance.opacity,
         )
         slider.isEnabled = store.isReady
         slider.progress = appearance.opacity
         slider.contentDescription = context.getString(R.string.ball_opacity_value, appearance.opacity)
         choices.forEach { (style, choice) ->
-            val selected = style == appearance.style
+            val selected = image == null && style == appearance.style
             choice.isChecked = selected
-            choice.isEnabled = store.isReady
+            choice.isEnabled = store.isReady && images.canEdit(AppearanceImage.BALL)
             choice.setTextColor(context.getColor(if (selected) R.color.brand_accent else R.color.text_primary))
             choice.typeface = Typeface.create("sans-serif-medium", if (selected) Typeface.BOLD else Typeface.NORMAL)
         }
@@ -222,12 +239,14 @@ class BallAppearanceView(context: Context) : LinearLayout(context) {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         store.observe(observer)
+        images.observe(observer)
         render()
     }
 
     override fun onDetachedFromWindow() {
         store.flush()
         store.removeObserver(observer)
+        images.removeObserver(observer)
         super.onDetachedFromWindow()
     }
 

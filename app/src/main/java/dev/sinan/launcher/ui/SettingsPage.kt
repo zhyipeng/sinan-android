@@ -17,6 +17,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import dev.sinan.launcher.R
 import dev.sinan.launcher.SinanApplication
+import dev.sinan.launcher.appearance.AppearanceImage
 
 /** 面板内第二页；保留原网格实例，以保持查询、滚动和当前会话排序。 */
 // 仅代码构建，宿主和操作回调为必需参数，不支持 XML 膨胀。
@@ -169,7 +170,7 @@ class SettingsPage(activity: Activity, onBack: () -> Unit, actions: SettingsActi
         column.addView(groupCard, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = activity.dp(14)
         })
-        column.addView(BallAppearanceView(activity))
+        column.addView(BallAppearanceView(activity, actions))
         column.addView(LayoutSettingsView(activity), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             topMargin = activity.dp(14)
         })
@@ -190,6 +191,10 @@ class SettingsPage(activity: Activity, onBack: () -> Unit, actions: SettingsActi
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             topMargin = activity.dp(14)
         })
+        column.addView(AppearanceImageControls(activity, AppearanceImage.PANEL, actions),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = activity.dp(14)
+            })
         addView(column)
         refresh()
     }

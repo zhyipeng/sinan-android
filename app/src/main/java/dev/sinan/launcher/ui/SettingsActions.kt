@@ -3,14 +3,18 @@ package dev.sinan.launcher.ui
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Toast
 import dev.sinan.launcher.R
 import dev.sinan.launcher.SinanApplication
+import dev.sinan.launcher.appearance.AppearanceImage
 import dev.sinan.launcher.ball.FloatingBallService
 
 /** 两种宿主共享设置操作；面板中的确认窗沿用 Overlay 类型。 */
@@ -174,6 +178,65 @@ class SettingsActions(
         } catch (_: android.content.ActivityNotFoundException) {
             onSystemUiFinished()
             Toast.makeText(activity, R.string.permission_settings_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun showCustomAppearance() {
+        val content = ScrollView(activity).apply {
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                val padding = activity.dp(16)
+                setPadding(padding, padding, padding, padding)
+                addView(BallAppearanceView(activity, this@SettingsActions))
+                addView(AppearanceImageControls(activity, AppearanceImage.PANEL, this@SettingsActions),
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = padding
+                    })
+            })
+        }
+        dialogBuilder().setTitle(R.string.appearance_images).setView(content)
+            .setPositiveButton(android.R.string.ok, null).showOwned()
+    }
+
+    @Suppress("DEPRECATION")
+    fun pickAppearanceImage(kind: AppearanceImage) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            beforeSystemUi()
+            activity.startActivityForResult(intent, kind.requestCode)
+        } catch (_: ActivityNotFoundException) {
+            onSystemUiFinished()
+            Toast.makeText(activity, R.string.appearance_picker_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun onAppearanceImageResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        val kind = AppearanceImage.entries.firstOrNull { it.requestCode == requestCode } ?: return
+        onSystemUiFinished()
+        if (resultCode != Activity.RESULT_OK) return
+        val uri = data?.data
+        if (uri?.scheme != "content") {
+            reportImageFailure(R.string.appearance_import_failed)
+            return
+        }
+        (activity.application as SinanApplication).appearanceImages.import(kind, uri) { success ->
+            if (!success) reportImageFailure(R.string.appearance_import_failed)
+        }
+    }
+
+    fun clearAppearanceImage(kind: AppearanceImage, onCleared: () -> Unit = {}) {
+        (activity.application as SinanApplication).appearanceImages.clear(kind) { success ->
+            if (success) onCleared() else reportImageFailure(R.string.appearance_reset_failed)
+        }
+    }
+
+    private fun reportImageFailure(message: Int) {
+        if (!activity.isFinishing && !activity.isDestroyed) {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
         }
     }
 

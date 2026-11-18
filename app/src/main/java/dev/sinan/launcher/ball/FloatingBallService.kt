@@ -14,6 +14,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
@@ -36,6 +37,8 @@ import dev.sinan.launcher.MainActivity
 import dev.sinan.launcher.PanelActivity
 import dev.sinan.launcher.R
 import dev.sinan.launcher.SinanApplication
+import dev.sinan.launcher.appearance.AppearanceImage
+import dev.sinan.launcher.appearance.AppearanceImageDrawable
 import dev.sinan.launcher.ui.dp
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -45,7 +48,9 @@ class FloatingBallService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val controller get() = (application as SinanApplication).ball
     private val appearance get() = (application as SinanApplication).ballAppearance
+    private val images get() = (application as SinanApplication).appearanceImages
     private var appliedStyle: BallStyle? = null
+    private var appliedImage: Bitmap? = null
     private val appearanceObserver: () -> Unit = { applyAppearance(); reconcile() }
     private val positions get() = (application as SinanApplication).ballPositions
     private val windows by lazy { getSystemService(WindowManager::class.java) }
@@ -119,6 +124,7 @@ class FloatingBallService : Service() {
             getSystemService(DisplayManager::class.java).registerDisplayListener(displayListener, main)
             createBall()
             appearance.observe(appearanceObserver)
+            images.observe(appearanceObserver)
             applyAppearance()
             val revision = positionRevision
             positions.load {
@@ -183,9 +189,14 @@ class FloatingBallService : Service() {
 
     private fun applyAppearance() {
         val value = appearance.current
-        if (appliedStyle != value.style) {
+        val image = images[AppearanceImage.BALL]
+        if (appliedStyle != value.style || appliedImage !== image) {
             appliedStyle = value.style
-            ball?.setImageDrawable(BallStyleDrawable(this, value.style))
+            appliedImage = image
+            ball?.setImageDrawable(
+                if (image == null) BallStyleDrawable(this, value.style)
+                else AppearanceImageDrawable(this, image, AppearanceImage.BALL),
+            )
         }
         params.alpha = value.opacity / 100f
         val touchSize = dp(maxOf(48, value.size))
@@ -296,7 +307,7 @@ class FloatingBallService : Service() {
         if (!controller.isEnabled) { stopSelf(); return }
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
         val interactive = getSystemService(PowerManager::class.java).isInteractive
-        val show = appearance.isReady && !controller.isPanelVisible && !locked && interactive
+        val show = appearance.isReady && images.isReady && !controller.isPanelVisible && !locked && interactive
         if (!show && attached) detach()
         else if (show && !attached) {
             try { windows.addView(ball, params); attached = true } catch (_: RuntimeException) { stopSelf() }
@@ -329,6 +340,7 @@ class FloatingBallService : Service() {
         main.removeCallbacksAndMessages(null)
         controller.removeObserver(observer)
         appearance.removeObserver(appearanceObserver)
+        images.removeObserver(appearanceObserver)
         appearance.flush()
         runCatching { getSystemService(AppOpsManager::class.java).stopWatchingMode(appOpsListener) }
         runCatching { unregisterReceiver(screenReceiver) }

@@ -3,6 +3,8 @@ package dev.sinan.launcher
 import android.app.Activity
 import android.app.Dialog
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.os.Handler
@@ -15,6 +17,8 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
+import dev.sinan.launcher.appearance.AppearanceImage
+import dev.sinan.launcher.appearance.AppearanceImageDrawable
 import dev.sinan.launcher.ui.AppGridView
 import dev.sinan.launcher.ui.SettingsActions
 import dev.sinan.launcher.ui.SettingsPage
@@ -26,13 +30,27 @@ import dev.sinan.launcher.ui.roundedShape
 class PanelActivity : Activity() {
     private var panel: Dialog? = null
     private val layoutStore get() = (application as SinanApplication).layoutPreferences
+    private val images get() = (application as SinanApplication).appearanceImages
+    private var appliedBackground: Drawable? = null
+    private var appliedImage: Bitmap? = null
     private val layoutObserver: () -> Unit = { applyLayoutPreferences() }
+    private val imageObserver: () -> Unit = { applyPanelBackground() }
 
     private fun applyLayoutPreferences() {
-        panel?.window?.setBackgroundDrawable(getDrawable(R.drawable.panel_background)?.mutate()?.apply {
-            alpha = layoutStore.current.panelOpacity * 255 / 100
-        })
+        applyPanelBackground()
         if (panel?.isShowing == true) resizePanel()
+    }
+
+    private fun applyPanelBackground() {
+        val window = panel?.window ?: return
+        val image = images[AppearanceImage.PANEL]
+        if (appliedBackground == null || appliedImage !== image) {
+            appliedImage = image
+            appliedBackground = if (image == null) getDrawable(R.drawable.panel_background)?.mutate()
+                else AppearanceImageDrawable(this, image, AppearanceImage.PANEL)
+            window.setBackgroundDrawable(appliedBackground)
+        }
+        appliedBackground?.alpha = layoutStore.current.panelOpacity * 255 / 100
     }
     private lateinit var grid: AppGridView
     private lateinit var settingsPage: SettingsPage
@@ -119,6 +137,7 @@ class PanelActivity : Activity() {
         }
         panel = dialog
         layoutStore.observe(layoutObserver)
+        images.observe(imageObserver)
         applyLayoutPreferences()
         root.requestApplyInsets()
     }
@@ -177,6 +196,7 @@ class PanelActivity : Activity() {
 
     override fun onDestroy() {
         layoutStore.removeObserver(layoutObserver)
+        images.removeObserver(imageObserver)
         layoutStore.flush()
         if (::settingsActions.isInitialized) settingsActions.dismissDialogs()
         (application as SinanApplication).ball.panelHidden(this)
@@ -224,6 +244,12 @@ class PanelActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (::settingsActions.isInitialized) settingsActions.onPermissionResult(requestCode, grantResults)
+    }
+
+    @Deprecated("Activity result callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (::settingsActions.isInitialized) settingsActions.onAppearanceImageResult(requestCode, resultCode, data)
     }
 
     private fun fallback() {

@@ -74,4 +74,17 @@
 仅已开启的悬浮球会在开机后尝试恢复。划掉最近任务不会主动关闭；强行停止、系统限制或厂商清理仍可能阻止恢复。关闭悬浮球后不再自动恢复。</string>
   <string name="keyboard_size">键盘大小</string>
   <string name="keyboard_size_description">键盘默认 100%，竖屏调整按键高度，横屏同时调整键盘宽度；文字和图标同步缩放，实际大小受可用空间限制。</string>
+  <string name="appearance_images">自定义外观</string>
+  <string name="panel_image_title">面板背景图</string>
+  <string name="panel_image_pick">选择背景图</string>
+  <string name="panel_image_replace">更换背景图</string>
+  <string name="panel_image_reset">恢复默认背景</string>
+  <string name="ball_image_pick">选择悬浮球图片</string>
+  <string name="ball_image_replace">更换悬浮球图片</string>
+  <string name="ball_image_reset">恢复内置样式</string>
+  <string name="ball_style_custom">自定义图片</string>
+  <string name="appearance_image_processing">正在处理图片…</string>
+  <string name="appearance_picker_failed">无法打开系统图片选择器</string>
+  <string name="appearance_import_failed">无法导入图片，原外观已保留</string>
+  <string name="appearance_reset_failed">无法恢复原外观，请重试</string>
 </resources>

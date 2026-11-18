@@ -2,6 +2,7 @@ package dev.sinan.launcher
 
 import android.app.Application
 import android.content.res.Configuration
+import dev.sinan.launcher.appearance.AppearanceImageStore
 import dev.sinan.launcher.apps.AppRepository
 import dev.sinan.launcher.ball.BallAppearanceStore
 import dev.sinan.launcher.ball.BallPositionStore
@@ -16,6 +17,7 @@ class SinanApplication : Application() {
     val ballAppearance by lazy { BallAppearanceStore(this) }
 
     val layoutPreferences by lazy { LayoutPreferencesStore(this) }
+    val appearanceImages by lazy { AppearanceImageStore(this) }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
