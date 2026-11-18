@@ -12,10 +12,12 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
+import dev.sinan.launcher.BuildConfig
 import dev.sinan.launcher.R
 import dev.sinan.launcher.SinanApplication
 import dev.sinan.launcher.appearance.AppearanceImage
 import dev.sinan.launcher.ball.FloatingBallService
+import dev.sinan.launcher.update.UpdateChecker
 
 /** 两种宿主共享设置操作；面板中的确认窗沿用 Overlay 类型。 */
 class SettingsActions(
@@ -238,6 +240,55 @@ class SettingsActions(
         if (!activity.isFinishing && !activity.isDestroyed) {
             Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
         }
+    }
+
+    private var updateRequestId = 0
+    private var checkingUpdate = false
+    private var checkingManually = false
+
+    fun cancelUpdateCheck() {
+        updateRequestId++
+        checkingUpdate = false
+    }
+
+    fun checkForUpdates(manual: Boolean = false) {
+        if (checkingUpdate && (!manual || checkingManually)) return
+        val requestId = ++updateRequestId
+        checkingUpdate = true
+        checkingManually = manual
+        if (manual) Toast.makeText(activity, R.string.update_checking, Toast.LENGTH_SHORT).show()
+        (activity.application as SinanApplication).updates.check(manual) { result ->
+            if (requestId != updateRequestId) return@check
+            checkingUpdate = false
+            if (activity.isFinishing || activity.isDestroyed || result == null) return@check
+            val release = result.getOrNull()
+            if (release != null) {
+                if (manual || !hasDialogs) showUpdate(release)
+            } else if (manual) {
+                val message = if (result.isSuccess) {
+                    activity.getString(R.string.update_current, BuildConfig.VERSION_NAME)
+                } else {
+                    activity.getString(R.string.update_failed)
+                }
+                Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun showUpdate(release: UpdateChecker.Release) {
+        dialogBuilder()
+            .setTitle(R.string.update_available)
+            .setMessage(activity.getString(R.string.update_available_message, BuildConfig.VERSION_NAME, release.version))
+            .setNegativeButton(R.string.update_later, null)
+            .setPositiveButton(R.string.update_download) { _, _ ->
+                try {
+                    beforeSystemUi()
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, release.downloadUri).addCategory(Intent.CATEGORY_BROWSABLE))
+                } catch (_: ActivityNotFoundException) {
+                    onSystemUiFinished()
+                    Toast.makeText(activity, R.string.update_browser_failed, Toast.LENGTH_LONG).show()
+                }
+            }.showOwned()
     }
 
     companion object { private const val BALL_NOTIFICATION_REQUEST = 210 }

@@ -81,6 +81,14 @@ AGP 与 Kotlin 的兼容依据见 [Android 官方说明](https://developer.andro
 
 推送 `main` 或提交面向 `main` 的 PR 时，[Android 构建](https://github.com/zhyipeng/sinan-android/actions/workflows/android.yml)会运行 Debug 构建、Lint 和搜索模块验证。通过后可在运行详情的 Artifacts 下载 `sinan-debug`，保留 14 天。
 
+## 下载与更新
+
+从 [GitHub Releases](https://github.com/zhyipeng/sinan-android/releases/latest) 下载正式签名的 APK。司南在进入前台时最多每 24 小时通过 GitHub 检查一次新版，也可在「设置 → 检查更新」手动检查。发现新版后，在浏览器下载 APK，打开文件并按 Android 提示安装。首次从浏览器安装可能需要在系统中授权该浏览器安装应用。
+
+以前用调试签名安装的版本需要先卸载，再安装 GitHub 正式版。卸载会移除该安装的本地设置和使用记录。正式版之间可覆盖升级。
+
+发布维护见 [GitHub 构建与分发](docs/github-release.md)。
+
 ## 来源与约定
 
 方案提炼自 [《设计安卓效率工具》原会话](chatgpt-conversation://6af58939-b008-83e8-a513-9f40fc13c38b)。用户明确表达的需求、原助手建议、本次工程默认值分别记录，原会话中的性能数字均为目标而非实测。

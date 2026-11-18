@@ -1,0 +1,86 @@
+name: Android 发布
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: android-release
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      ANDROID_BUILD_TOOLS_VERSION: '35.0.0'
+    steps:
+      - name: 检出版本标签
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 校验发布来源
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+      - name: 配置 JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: 安装 Android SDK
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/apksigner" ]]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' "build-tools;$ANDROID_BUILD_TOOLS_VERSION"
+          fi
+      - name: 验证并构建发布包
+        run: ./gradlew --no-daemon :app:assembleRelease :app:lintRelease :core:search:build
+      - name: 校验 APK 版本
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          metadata=app/build/outputs/apk/release/output-metadata.json
+          version_name=$(jq -er '.elements[0].versionName' "$metadata")
+          version_code=$(jq -er '.elements[0].versionCode | select(type == "number" and . > 0)' "$metadata")
+          [[ "$GITHUB_REF_NAME" == "v$version_name" ]] || {
+            echo '标签与 APK versionName 不一致' >&2
+            exit 1
+          }
+          released_code=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false) | .assets[].name | select(test("^sinan-[0-9]+[.]apk$")) | capture("sinan-(?<code>[0-9]+)").code | tonumber' \
+            | jq -s 'max // 0')
+          if (( version_code <= released_code )); then
+            echo 'APK versionCode 必须大于所有已发布版本' >&2
+            exit 1
+          fi
+          echo "apk=dist/sinan-$version_code.apk" >> "$GITHUB_OUTPUT"
+      - name: 对 APK 签名并验证
+        env:
+          SINAN_RELEASE_KEYSTORE: ${{ secrets.SINAN_RELEASE_KEYSTORE }}
+          SINAN_RELEASE_PASSWORD: ${{ secrets.SINAN_RELEASE_PASSWORD }}
+          APK: ${{ steps.version.outputs.apk }}
+        run: |
+          umask 077
+          signing_dir=$(mktemp -d)
+          trap 'rm -f "$signing_dir/release.p12" "$signing_dir/release-pass.txt"; rmdir "$signing_dir"' EXIT
+          printf '%s' "${SINAN_RELEASE_KEYSTORE:?缺少签名文件}" | base64 --decode > "$signing_dir/release.p12"
+          printf '%s\n' "${SINAN_RELEASE_PASSWORD:?缺少签名口令}" > "$signing_dir/release-pass.txt"
+          unset SINAN_RELEASE_KEYSTORE SINAN_RELEASE_PASSWORD
+          ./tools/package_release.sh --keystore "$signing_dir/release.p12" \
+            --ks-alias sinan-release --ks-pass-file "$signing_dir/release-pass.txt" --output "$APK"
+      - name: 发布 APK 到 GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.version.outputs.apk }}
+        run: gh release create "$GITHUB_REF_NAME" "$APK" --verify-tag --generate-notes --latest --title "司南 $GITHUB_REF_NAME"

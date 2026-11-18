@@ -61,8 +61,12 @@ if [ -z "$SDK_DIR" ] || [ ! -d "$SDK_DIR" ]; then
   exit 1
 fi
 
-BT_DIR="$(ls -d "$SDK_DIR"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"
-BT_DIR="${BT_DIR%/}"
+if [ -n "${ANDROID_BUILD_TOOLS_VERSION:-}" ]; then
+  BT_DIR="$SDK_DIR/build-tools/$ANDROID_BUILD_TOOLS_VERSION"
+else
+  BT_DIR="$(ls -d "$SDK_DIR"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"
+  BT_DIR="${BT_DIR%/}"
+fi
 if [ -z "$BT_DIR" ] || [ ! -x "$BT_DIR/apksigner" ] || [ ! -x "$BT_DIR/zipalign" ]; then
   echo "错误：在 $SDK_DIR/build-tools 下找不到可用的 apksigner/zipalign" >&2
   exit 1

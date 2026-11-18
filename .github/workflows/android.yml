@@ -30,7 +30,10 @@ jobs:
           java-version: '17'
           cache: gradle
       - name: 安装 Android SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0'
+          fi
       - name: 构建 APK 并运行检查
         run: ./gradlew --no-daemon :app:assembleDebug :app:lintDebug :core:search:build
       - name: 上传调试 APK

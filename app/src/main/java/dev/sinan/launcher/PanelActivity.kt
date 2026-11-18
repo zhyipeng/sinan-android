@@ -146,6 +146,7 @@ class PanelActivity : Activity() {
 
     override fun onPause() {
         cancelBallRestore()
+        if (::settingsActions.isInitialized) settingsActions.cancelUpdateCheck()
         super.onPause()
     }
 
@@ -156,6 +157,7 @@ class PanelActivity : Activity() {
         if (::settingsPage.isInitialized) settingsPage.refresh()
         systemUiPending = false
         showPanel()
+        if (panel?.isShowing == true) settingsActions.checkForUpdates()
     }
 
     private fun showPanel() {

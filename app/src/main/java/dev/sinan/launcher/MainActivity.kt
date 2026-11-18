@@ -211,6 +211,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         cancelBallRestore()
+        settingsActions.cancelUpdateCheck()
         super.onPause()
     }
 
@@ -219,6 +220,7 @@ class MainActivity : Activity() {
         cancelBallRestore()
         cancelBallRestore = (application as SinanApplication).ball.restoreWhenReady()
         if (::permission.isInitialized) {
+            settingsActions.checkForUpdates()
             val allowed = Settings.canDrawOverlays(this)
             permission.setText(if (allowed) R.string.open_panel else R.string.allow_overlay)
             description.setText(if (allowed) R.string.overlay_enabled else R.string.overlay_optional)
@@ -260,6 +262,7 @@ class MainActivity : Activity() {
                     getString(R.string.layout_settings),
                     getString(R.string.ball_background),
                     getString(R.string.appearance_images),
+                    getString(R.string.update_check),
                 ),
             ) { _, index ->
                 when (index) {
@@ -269,6 +272,7 @@ class MainActivity : Activity() {
                     3 -> settingsActions.showLayoutSettings()
                     4 -> settingsActions.showBallBackgroundSettings()
                     5 -> settingsActions.showCustomAppearance()
+                    6 -> settingsActions.checkForUpdates(manual = true)
                 }
             }.show()
     }
