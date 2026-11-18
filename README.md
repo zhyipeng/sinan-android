@@ -77,11 +77,15 @@ APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。安装命令需要连�
 
 AGP 与 Kotlin 的兼容依据见 [Android 官方说明](https://developer.android.com/build/releases/agp-8-13-0-release-notes)和 [Kotlin 官方兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)。AGP 8.13.2 补充 Kotlin 2.3 的 R8 支持；具体工具链以实际构建结果为准，不自动追随最新版本。
 
+## GitHub 自动构建
+
+推送 `main` 或提交面向 `main` 的 PR 时，[Android 构建](https://github.com/zhyipeng/sinan-android/actions/workflows/android.yml)会运行 Debug 构建、Lint 和搜索模块验证。通过后可在运行详情的 Artifacts 下载 `sinan-debug`，保留 14 天。
+
 ## 来源与约定
 
 方案提炼自 [《设计安卓效率工具》原会话](chatgpt-conversation://6af58939-b008-83e8-a513-9f40fc13c38b)。用户明确表达的需求、原助手建议、本次工程默认值分别记录，原会话中的性能数字均为目标而非实测。
 
-产品名已确认是「司南」；应用 ID `dev.sinan.launcher` 为开发阶段默认值，发布前需确认。当前未选择开源许可证、配置远程仓库或发布签名。
+产品名已确认是「司南」；应用 ID `dev.sinan.launcher` 为开发阶段默认值，发布前需确认。源码托管在 [GitHub](https://github.com/zhyipeng/sinan-android)，暂未选择开源许可证。
 
 ## 使用当前版本
 
